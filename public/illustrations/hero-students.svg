@@ -1,0 +1,108 @@
+<svg width="600" height="400" viewBox="0 0 600 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Blob -->
+  <path d="M100 200 C80 100, 200 50, 350 70 C500 90, 550 150, 520 250 C490 350, 300 350, 200 320 C120 290, 120 300, 100 200 Z" fill="#E8F7F0"/>
+  
+  <!-- Desk -->
+  <path d="M150 280 L480 280 L450 320 L120 320 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+  
+  <!-- Left Student (Girl) -->
+  <g id="left-student">
+    <!-- Body -->
+    <path d="M190 280 C180 240, 190 210, 230 210 C270 210, 280 240, 270 280 Z" fill="#E8F7F0" stroke="#083D33" stroke-width="2"/>
+    <path d="M220 210 L220 230 C220 250, 240 250, 240 230 L240 210" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Head -->
+    <path d="M210 180 C210 150, 250 150, 250 180 C250 200, 230 215, 220 210 C210 200, 210 190, 210 180 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Hair -->
+    <path d="M200 170 C190 150, 220 130, 240 140 C260 150, 260 180, 250 190 C250 170, 230 160, 200 170 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Face -->
+    <circle cx="235" cy="175" r="2" fill="#083D33"/>
+    <path d="M245 175 Q250 175, 255 180" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <path d="M245 185 Q250 190, 255 185" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <!-- Laptop -->
+    <path d="M220 280 L280 280 L270 240 L210 240 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M200 280 L290 280 L285 290 L195 290 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Arms -->
+    <path d="M200 240 C190 260, 200 270, 230 270" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Middle Student (Boy) -->
+  <g id="mid-student">
+    <!-- Body -->
+    <path d="M290 280 C280 230, 300 190, 340 190 C380 190, 400 230, 390 280 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Head -->
+    <path d="M315 160 C315 130, 365 130, 365 160 C365 180, 345 195, 335 190 C325 180, 315 170, 315 160 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Hair -->
+    <path d="M310 150 C310 120, 350 110, 370 130 C380 140, 380 160, 370 165 C360 140, 330 140, 310 150 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Face -->
+    <circle cx="330" cy="155" r="2" fill="#083D33"/>
+    <circle cx="350" cy="155" r="2" fill="#083D33"/>
+    <path d="M335 170 Q340 175, 345 170" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <!-- Notebook -->
+    <path d="M300 280 L380 280 L360 250 L280 250 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+    <line x1="320" y1="255" x2="360" y2="255" stroke="#083D33" stroke-width="1" stroke-dasharray="4 2"/>
+    <line x1="315" y1="265" x2="365" y2="265" stroke="#083D33" stroke-width="1" stroke-dasharray="4 2"/>
+    <!-- Arms holding pencil -->
+    <path d="M300 220 C320 240, 320 260, 330 260" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <path d="M380 220 C360 240, 350 250, 340 260" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <!-- Pencil -->
+    <line x1="330" y1="260" x2="310" y2="240" stroke="#083D33" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Right Student (Girl) -->
+  <g id="right-student">
+    <!-- Body -->
+    <path d="M400 280 C390 230, 410 200, 450 200 C480 200, 490 240, 480 280 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Head -->
+    <path d="M430 170 C430 140, 470 140, 470 170 C470 190, 450 205, 440 200 C430 190, 430 180, 430 170 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Hair/Ponytail -->
+    <path d="M420 160 C420 130, 460 120, 480 140 C490 150, 490 170, 480 180 C470 150, 440 150, 420 160 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <path d="M470 160 C490 150, 500 170, 490 190 C480 200, 470 180, 470 160 Z" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+    <!-- Face -->
+    <circle cx="445" cy="165" r="2" fill="#083D33"/>
+    <path d="M455 165 Q460 165, 465 170" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+    <!-- Book standing up -->
+    <path d="M410 280 L440 280 L430 230 L400 230 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M440 280 L470 280 L460 230 L430 230 Z" fill="#ffffff" stroke="#083D33" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Arms -->
+    <path d="M470 240 C450 260, 440 270, 440 280" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Floating Icons & Decorations -->
+  <circle cx="160" cy="130" r="15" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <circle cx="155" cy="125" r="3" fill="#083D33"/>
+  <circle cx="165" cy="135" r="3" fill="#083D33"/>
+  <line x1="155" y1="125" x2="165" y2="135" stroke="#083D33" stroke-width="1.5"/>
+
+  <!-- Lightbulb -->
+  <circle cx="310" cy="70" r="20" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <path d="M305 65 C305 60, 315 60, 315 65 L310 75 Z" fill="none" stroke="#083D33" stroke-width="2"/>
+  <line x1="305" y1="78" x2="315" y2="78" stroke="#083D33" stroke-width="2"/>
+
+  <!-- Chat Bubble -->
+  <circle cx="390" cy="65" r="16" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <rect x="382" y="58" width="16" height="12" rx="2" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="385" y1="62" x2="395" y2="62" stroke="#083D33" stroke-width="1"/>
+  <line x1="385" y1="66" x2="392" y2="66" stroke="#083D33" stroke-width="1"/>
+
+  <!-- Pencil Icon -->
+  <circle cx="460" cy="80" r="18" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <path d="M455 85 L465 75 L468 78 L458 88 Z" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="455" y1="85" x2="452" y2="89" stroke="#083D33" stroke-width="1.5"/>
+
+  <!-- Checkmark -->
+  <circle cx="500" cy="150" r="18" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <polyline points="493,150 498,155 508,143" fill="none" stroke="#083D33" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Map -->
+  <circle cx="510" cy="100" r="16" fill="#ffffff" stroke="#083D33" stroke-width="2"/>
+  <path d="M502 92 L508 95 L514 92 L520 95 L520 108 L514 105 L508 108 L502 105 Z" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="508" y1="95" x2="508" y2="108" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="514" y1="92" x2="514" y2="105" stroke="#083D33" stroke-width="1.5"/>
+
+  <!-- Small dots and stars -->
+  <circle cx="200" cy="80" r="2" fill="#059669"/>
+  <circle cx="280" cy="40" r="2" fill="#059669"/>
+  <circle cx="430" cy="50" r="2" fill="#059669"/>
+  <circle cx="550" cy="130" r="2" fill="#059669"/>
+  <path d="M110 150 L115 152 L110 154 L108 159 L106 154 L101 152 L106 150 L108 145 Z" fill="#059669"/>
+</svg>

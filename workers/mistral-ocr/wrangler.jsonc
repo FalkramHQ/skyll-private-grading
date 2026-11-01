@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "skyll-mistral-ocr",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-23",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "WORKER_CALLBACK_URL": "https://www.skyllai.com",
+    "MISTRAL_OCR_MODEL": "mistral-ocr-latest",
+    "OCR_CONCURRENCY": "2"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "OCR_JOBS",
+        "queue": "skyll-mistral-ocr"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "skyll-mistral-ocr",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "retry_delay": 60,
+        "dead_letter_queue": "skyll-mistral-ocr-dlq"
+      }
+    ]
+  }
+}

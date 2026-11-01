@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /crm/
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /review
+Disallow: /exam
+Disallow: /parent/
+Disallow: /r/
+Disallow: /f/
+Disallow: /inquire/
+
+Sitemap: https://www.skyllai.com/sitemap.xml

@@ -1,0 +1,5 @@
+{
+  "name": "@skyll/mistral-ocr-worker",
+  "private": true,
+  "type": "module"
+}

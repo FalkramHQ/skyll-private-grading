@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local Worker development. Never commit real values.
+MISTRAL_API_KEY=
+DEEPSEEK_API_KEY=
+TURSO_DATABASE_URL=
+TURSO_AUTH_TOKEN=
+OCR_WORKER_SHARED_SECRET=

@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Skyll AI",
+    "slug": "skyll-intake",
+    "version": "0.4.1",
+    "icon": "./assets/skyll-logo.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.skyll.intake",
+      "versionCode": 8,
+      "allowBackup": false,
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.skyll.intake",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Skyll uses the camera to scan answer sheets for assessment intake.",
+        "NSPhotoLibraryUsageDescription": "Skyll may access photos when you choose images of answer sheets.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      [
+        "@preeternal/react-native-document-scanner-plugin",
+        {
+          "analysisFeatures": "none"
+        }
+      ],
+      "expo-secure-store",
+      "./plugins/withBinaryOptimizations",
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#3A3AE8",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1f86901e-87ca-4a9e-93b8-aa71da341aff"
+      }
+    },
+    "owner": "skyll",
+    "updates": {
+      "url": "https://u.expo.dev/1f86901e-87ca-4a9e-93b8-aa71da341aff"
+    }
+  }
+}

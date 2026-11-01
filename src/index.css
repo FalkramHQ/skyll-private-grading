@@ -1,0 +1,372 @@
+@import "tailwindcss";
+
+/* Self-hosted: the production CSP only allows fonts from 'self'. */
+@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+@import "@fontsource-variable/instrument-sans/wght.css";
+@import "@fontsource-variable/anek-devanagari/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-foreground: var(--success-soft-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-foreground: var(--warning-soft-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-soft-foreground: var(--destructive-soft-foreground);
+
+  /* Skyll Notebook additions (docs/plans/SKYLL_NOTEBOOK_DESIGN.md) */
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-sunken: var(--sunken);
+  --color-hairline: var(--hairline);
+  --color-action: var(--action);
+  --color-action-pressed: var(--action-pressed);
+  --color-action-tint: var(--action-tint);
+  --color-lime: var(--lime);
+  --color-coral: var(--coral);
+  --color-info: var(--info);
+  --color-faint: #8F8B80;
+  --color-paper-soft: #FAF8F2;
+  --color-hairline-strong: #C9C4B6;
+  --color-info-soft: var(--info-soft);
+  --color-chart-1: #4B4BE8;
+  --color-chart-2: #E0622F;
+  --color-chart-3: #0E9480;
+  --color-chart-4: #9B3FA8;
+  --color-seq-1: #A9A9F4;
+  --color-seq-2: #7C7CEF;
+  --color-seq-3: #4B4BE8;
+  --color-seq-4: #2E2EC2;
+  --color-seq-5: #1C1C80;
+
+  --font-display: var(--font-headline);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-data);
+
+  /* Hard offset shadows: the sticker look. Loud screens use -lg. */
+  --shadow-hard-sm: 2px 2px 0 var(--ink);
+  --shadow-hard: 3px 3px 0 var(--ink);
+  --shadow-hard-md: 4px 4px 0 var(--ink);
+  --shadow-hard-lg: 5px 5px 0 var(--ink);
+}
+
+/* Font families & Design System Theme Tokens */
+:root {
+  --font-headline: 'Bricolage Grotesque Variable', 'Anek Devanagari Variable', system-ui, sans-serif;
+  --font-body: 'Instrument Sans Variable', 'Anek Devanagari Variable', system-ui, sans-serif;
+  --font-data: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+  --header-height: 72px;
+
+  /* Skyll Notebook: paper, ink, one action blue, lime and coral accents. */
+  --paper: #F5F3EC;
+  --ink: #111111;
+  --sunken: #ECE9E0;
+  --hairline: #D9D5CA;
+  --action: #3A3AE8;
+  --action-pressed: #2A2AB8;
+  --action-tint: #E4E4FB;
+  --lime: #C9F230;
+  --coral: #FF6A3D;
+  --info: #2A2AB8;
+  --info-soft: #ECECFD;
+
+  /* Skyll Token Hierarchy (names kept so existing components re-theme) */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: #FFFFFF;
+  --card-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: #FFFFFF;
+  --accent: var(--action);
+  --accent-foreground: #FFFFFF;
+  --muted: var(--sunken);
+  --muted-foreground: #625F57;
+  --foreground-secondary: #4D4B45;
+  --destructive: #B4122E;
+  --destructive-foreground: #FFFFFF;
+  --success: #0B6B3A;
+  --warning: #8A4B00;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--action);
+
+  /* Semantic soft backgrounds for status badges */
+  --success-soft: #DFF5E7;
+  --success-soft-foreground: #0B6B3A;
+  --warning-soft: #FFF1CC;
+  --warning-soft-foreground: #8A4B00;
+  --destructive-soft: #FDE8EA;
+  --destructive-soft-foreground: #B4122E;
+}
+
+
+/* Element defaults live in the base layer so Tailwind utilities override them. */
+@layer base {
+  body {
+    font-family: var(--font-body);
+    font-weight: 400;
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'ss01' on;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-headline);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  button {
+    font-family: var(--font-body);
+    font-weight: 600;
+  }
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+/* Loud volume: the dot-grid notebook page. Student, parent and marketing only. */
+.notebook-grid {
+  background-color: var(--paper);
+  background-image: radial-gradient(#D6D2C6 1.2px, transparent 1.2px);
+  background-size: 18px 18px;
+}
+
+/* Hard-shadow press: the button sinks into its shadow. */
+.press {
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+.press:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press { transition: none; }
+}
+
+.tabular-nums, .font-data {
+  font-variant-numeric: tabular-nums;
+}
+
+html {
+}
+
+/* Unified layout container for cross-laptop consistency */
+.layout-container {
+  width: 100%;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .layout-container {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .layout-container {
+    padding-left: 4rem;
+    padding-right: 4rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .layout-container {
+    padding-left: 5rem;
+    padding-right: 5rem;
+  }
+}
+
+/* Responsive wrappers for tables & data cards */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Headline and data fonts. Base layer, so weight and tracking utilities
+ * (font-extrabold, tracking-tight) on the same element win. */
+@layer base {
+  .font-headline {
+    font-family: var(--font-headline);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .font-data {
+    font-family: var(--font-data);
+    font-weight: 400;
+  }
+}
+
+/* Map ping animation */
+@keyframes map-ping {
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.map-ping {
+  animation: map-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Hide scrollbars on intentional overflow strips (tabs, chips) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C9C4B6;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8F8B80;
+}
+
+/* Marquee animation for logos */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 60s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ── Notebook loader ──────────────────────────────────────────────────────
+ * A lime grading sticker that wobbles, presses into its hard shadow and inks
+ * a tick, then wipes it and starts again. Pure CSS + inline SVG, so it renders
+ * the same everywhere, including under the production CSP. Inline (in buttons
+ * and in-flow) it becomes three ink dots in the current text colour.
+ * ------------------------------------------------------------------------ */
+.ink-loader {
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: visible;
+  vertical-align: middle;
+}
+.ink-loader__wobble {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ink-loader-wobble 1.6s ease-in-out infinite;
+}
+.ink-loader__shadow { fill: var(--ink); }
+.ink-loader__face {
+  animation: ink-loader-stamp 1.6s ease-in-out infinite;
+}
+.ink-loader__disc {
+  fill: var(--lime);
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+.ink-loader__tick {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ink-loader-tick 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes ink-loader-wobble {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(6deg); }
+}
+@keyframes ink-loader-stamp {
+  0%, 30% { transform: translate(0, 0); }
+  40% { transform: translate(2.5px, 2.5px); }
+  52%, 100% { transform: translate(0, 0); }
+}
+@keyframes ink-loader-tick {
+  0%, 12% { stroke-dashoffset: 1; }
+  42%, 74% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1; }
+}
+
+.ink-dots {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  height: 1em;
+  vertical-align: middle;
+}
+.ink-dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: ink-dot 0.9s ease-in-out infinite;
+}
+.ink-dots > span:nth-child(2) { animation-delay: 0.12s; }
+.ink-dots > span:nth-child(3) { animation-delay: 0.24s; }
+
+@keyframes ink-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-loader__wobble,
+  .ink-loader__face,
+  .ink-dots > span {
+    animation: none;
+  }
+  .ink-loader__wobble { transform: rotate(-4deg); }
+  .ink-loader__tick { animation: none; stroke-dashoffset: 0; }
+  .ink-dots > span { opacity: 0.7; }
+}
+

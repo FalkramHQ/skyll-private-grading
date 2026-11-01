@@ -1,0 +1,39 @@
+#!/bin/sh
+# Pre-push guardrail: block force-pushes that would destroy remote commits.
+# To bypass in an emergency: git push --no-verify
+
+protected_branch="main"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # Only protect main
+  remote_branch=$(echo "$remote_ref" | sed 's|refs/heads/||')
+  if [ "$remote_branch" != "$protected_branch" ]; then
+    continue
+  fi
+
+  # Check if remote_sha is zero (new branch — always allow)
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  # Check if remote_sha is an ancestor of local_sha (normal fast-forward)
+  if git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    continue
+  fi
+
+  # Force push detected — count commits that would be destroyed
+  orphan_count=$(git rev-list --count "$local_sha..$remote_sha" 2>/dev/null || echo "?")
+  orphan_log=$(git log --oneline "$local_sha..$remote_sha" 2>/dev/null | head -10)
+
+  echo ""
+  echo "  ✗ PUSH BLOCKED: Force-push to $protected_branch would destroy $orphan_count commit(s):"
+  echo ""
+  echo "$orphan_log"
+  echo ""
+  echo "  If this is intentional, bypass with: git push --no-verify"
+  echo "  Otherwise, integrate remote changes: git pull --rebase origin main"
+  echo ""
+  exit 1
+done
+
+exit 0

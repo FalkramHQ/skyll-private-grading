@@ -1,0 +1,370 @@
+diff --git a/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/DocumentScannerModule.kt b/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/DocumentScannerModule.kt
+index d1afa70..f2f9ef9 100644
+--- a/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/DocumentScannerModule.kt
++++ b/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/DocumentScannerModule.kt
+@@ -1,6 +1,7 @@
+ package com.preeternal.scanner
+ 
+ import android.app.Activity
++import android.content.Context
+ import android.graphics.Bitmap
+ import android.graphics.BitmapFactory
+ import android.net.Uri
+@@ -38,6 +39,7 @@ import com.preeternal.scanner.text.TextExtractor
+ import com.preeternal.scanner.text.TextExtractorImpl
+ import com.preeternal.scanner.text.TextLineResult
+ import java.io.ByteArrayOutputStream
++import java.io.File
+ import java.io.FileNotFoundException
+ import java.lang.ref.WeakReference
+ import kotlin.coroutines.resume
+@@ -62,6 +64,11 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
+   companion object {
+     const val NAME = "DocumentScanner"
+     private const val ANDROID_15_API = 35
++    // Optional key on scanDocument(options): keys the durable, cross-process
++    // manifest written by PendingScanStore so a restarted app can recover it.
++    private const val SCAN_SESSION_ID_KEY = "scanSessionId"
++    // Abandoned sessions are pruned after this long on the next persist call.
++    private const val SESSION_MAX_AGE_MS = 24L * 60L * 60L * 1000L
+     private const val BARCODE_EXTRACTION_TIMEOUT_MS = 10_000L
+     private const val TEXT_EXTRACTION_TIMEOUT_MS = 25_000L
+     private const val MIN_EXTRACTION_TIMEOUT_MS = 1_000L
+@@ -124,6 +131,8 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
+     pendingPromise = promise
+     pendingOptions = options
+     pendingQuality = if (options.hasKey("croppedImageQuality")) options.getInt("croppedImageQuality") else 100
++    // Opportunistic cleanup of abandoned sessions from earlier runs.
++    scope.launch { PendingScanStore.pruneExpired(reactApplicationContext, SESSION_MAX_AGE_MS) }
+     logDebug(
+       "scanDocument options responseType=${getStringOrNull(options, "responseType") ?: "default"} croppedImageQuality=$pendingQuality"
+     )
+@@ -410,8 +419,35 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
+         "document-scanner",
+         ActivityResultContracts.StartIntentSenderForResult()
+       ) { result ->
+-        val promise = pendingPromise ?: return@register
++        // Persist first, resolve second. If Android kills this process between
++        // the two, the durable copy in filesDir still lets the next process
++        // recover the scan via consumePendingScanResult(sessionId).
+         val options = pendingOptions
++        val sessionId = options?.let { getStringOrNull(it, SCAN_SESSION_ID_KEY) }
++        if (result.resultCode == Activity.RESULT_OK && !sessionId.isNullOrBlank()) {
++          val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
++          val rawUris = docResult?.pages.orEmpty().mapNotNull { it.imageUri }
++          if (rawUris.isNotEmpty()) {
++            val durable = PendingScanStore.persist(activity, sessionId, rawUris)
++            if (durable.isNotEmpty()) {
++              // The plugin's temporary output dir lives under cacheDir and can
++              // be purged; drop it now that the bytes are safely in filesDir.
++              purgeScannerCache(activity)
++              logDebug("scan result persisted for session=$sessionId pages=${durable.size}")
++            } else {
++              logWarn("scan result persist produced no pages for session=$sessionId")
++            }
++          }
++        }
++
++        // A live promise may be gone (process was recreated mid-scan). The
++        // manifest above is the recovery channel in that case, so a missing
++        // promise must not be treated as an error.
++        val promise = pendingPromise ?: run {
++          logWarn("scanner result arrived with no live promise; durable manifest retained")
++          clearPending()
++          return@register
++        }
+         val response = WritableNativeMap()
+         val images = WritableNativeArray()
+ 
+@@ -447,6 +483,47 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
+     }
+   }
+ 
++  override fun consumePendingScanResult(options: ReadableMap, promise: Promise) {
++    val sessionId = getStringOrNull(options, SCAN_SESSION_ID_KEY)
++    if (sessionId.isNullOrBlank()) {
++      resolveOnUi(promise, null)
++      return
++    }
++    scope.launch {
++      val pages = PendingScanStore.read(reactApplicationContext, sessionId)
++      if (pages.isNullOrEmpty()) {
++        resolveOnUi(promise, null)
++        return@launch
++      }
++      val response = WritableNativeMap()
++      response.putString("status", "success")
++      val images = WritableNativeArray()
++      for (page in pages) images.pushString(page)
++      response.putArray("scannedImages", images)
++      resolveOnUi(promise, response)
++    }
++  }
++
++  override fun discardPendingScanResult(options: ReadableMap, promise: Promise) {
++    val sessionId = getStringOrNull(options, SCAN_SESSION_ID_KEY)
++    if (!sessionId.isNullOrBlank()) {
++      PendingScanStore.discard(reactApplicationContext, sessionId)
++    }
++    resolveOnUi(promise, null)
++  }
++
++  /**
++   * Removes the plugin's transient scanner-output cache. Those files are only
++   * needed until the durable copy succeeds.
++   */
++  private fun purgeScannerCache(context: Context) {
++    try {
++      File(context.cacheDir, "document-scanner").deleteRecursively()
++    } catch (_: Exception) {
++      // Best effort; the OS reclaims cacheDir anyway.
++    }
++  }
++
+   private fun processPages(
+     activity: Activity,
+     pages: List<GmsDocumentScanningResult.Page>,
+diff --git a/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/PendingScanStore.kt b/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/PendingScanStore.kt
+new file mode 100644
+index 0000000..fc3629e
+--- /dev/null
++++ b/node_modules/@preeternal/react-native-document-scanner-plugin/android/src/main/java/com/preeternal/scanner/PendingScanStore.kt
+@@ -0,0 +1,134 @@
++package com.preeternal.scanner
++
++import android.content.Context
++import android.net.Uri
++import org.json.JSONArray
++import org.json.JSONObject
++import java.io.File
++import java.io.FileOutputStream
++import java.util.concurrent.ConcurrentHashMap
++
++/**
++ * Durable, cross-process store for document scanner results.
++ *
++ * ML Kit hands back `content://` URIs whose permission is tied to the current
++ * process. On low-RAM Android devices the OS can kill Skyll's React process
++ * while the external scanner activity is foregrounded, so those URIs (and the
++ * in-memory Promise that would have carried them to JS) are gone by the time
++ * the scan finishes. To survive that, the raw page bytes are copied into the
++ * app's private `filesDir` *inside the activity-result callback*, and a small
++ * JSON manifest keyed by a scan-session id is written next to them. A freshly
++ * started process can then ask for the result by id and still receive the pages.
++ *
++ * `filesDir` is deliberate: the OS never clears it the way it clears caches,
++ * which matters precisely under the memory pressure that triggers this bug.
++ */
++internal object PendingScanStore {
++  private const val ROOT_DIR = "scan-sessions"
++  private const val MANIFEST_FILE = "manifest.json"
++
++  // Guards concurrent read/write of the same session within one process.
++  private val lock = Any()
++
++  private fun rootDir(context: Context): File =
++    File(context.filesDir, ROOT_DIR).apply { if (!exists()) mkdirs() }
++
++  private fun sessionDir(context: Context, sessionId: String): File =
++    File(rootDir(context), sanitize(sessionId))
++
++  private fun sanitize(sessionId: String): String {
++    // Session ids are generated by JS, but never trust them as path segments.
++    val safe = sessionId.replace(Regex("[^A-Za-z0-9._-]"), "_")
++    return if (safe.isBlank()) "session" else safe
++  }
++
++  /**
++   * Copies every readable page into `filesDir` and writes the manifest.
++   * Returns the durable `file://` URIs, or an empty list when nothing could be
++   * persisted (in which case the caller still resolves the in-memory result).
++   */
++  fun persist(context: Context, sessionId: String, sourceUris: List<Uri>): List<String> {
++    if (sessionId.isBlank() || sourceUris.isEmpty()) return emptyList()
++    synchronized(lock) {
++      val dir = sessionDir(context, sessionId)
++      if (!dir.exists()) dir.mkdirs()
++      val durable = mutableListOf<String>()
++      sourceUris.forEachIndexed { index, uri ->
++        val target = File(dir, "page-$index.jpg")
++        try {
++          context.contentResolver.openInputStream(uri)?.use { input ->
++            FileOutputStream(target).use { output -> input.copyTo(output) }
++          } ?: return@forEachIndexed
++          if (target.length() > 0) durable.add(Uri.fromFile(target).toString())
++        } catch (_: Exception) {
++          // Skip unreadable page; valid pages are still recoverable.
++          target.delete()
++        }
++      }
++      if (durable.isEmpty()) {
++        dir.deleteRecursively()
++        return emptyList()
++      }
++      val manifest = JSONObject().apply {
++        put("sessionId", sessionId)
++        put("createdAt", System.currentTimeMillis())
++        put("pages", JSONArray(durable))
++      }
++      File(dir, MANIFEST_FILE).writeText(manifest.toString())
++      return durable
++    }
++  }
++
++  /** Returns the persisted page URIs for [sessionId], or null if none exist. */
++  fun read(context: Context, sessionId: String): List<String>? {
++    if (sessionId.isBlank()) return null
++    synchronized(lock) {
++      val manifestFile = File(sessionDir(context, sessionId), MANIFEST_FILE)
++      if (!manifestFile.exists()) return null
++      return try {
++        val json = JSONObject(manifestFile.readText())
++        val array = json.optJSONArray("pages") ?: return null
++        val pages = mutableListOf<String>()
++        for (index in 0 until array.length()) {
++          val page = array.optString(index, "")
++          if (page.isNotBlank() && File(Uri.parse(page).path ?: "").exists()) pages.add(page)
++        }
++        if (pages.isEmpty()) null else pages
++      } catch (_: Exception) {
++        null
++      }
++    }
++  }
++
++  fun discard(context: Context, sessionId: String) {
++    if (sessionId.isBlank()) return
++    synchronized(lock) {
++      sessionDir(context, sessionId).deleteRecursively()
++    }
++  }
++
++  /**
++   * Deletes session directories older than [maxAgeMs]. Called opportunistically
++   * on each persist so an abandoned scan's files cannot accumulate forever.
++   */
++  fun pruneExpired(context: Context, maxAgeMs: Long) {
++    synchronized(lock) {
++      val root = rootDir(context)
++      val cutoff = System.currentTimeMillis() - maxAgeMs
++      root.listFiles()?.forEach { dir ->
++        val manifest = File(dir, MANIFEST_FILE)
++        val createdAt = if (manifest.exists()) {
++          try {
++            JSONObject(manifest.readText()).optLong("createdAt", 0L)
++          } catch (_: Exception) {
++            0L
++          }
++        } else {
++          0L
++        }
++        val stamp = if (createdAt > 0L) createdAt else dir.lastModified()
++        if (stamp in 1 until cutoff) dir.deleteRecursively()
++      }
++    }
++  }
++}
+diff --git a/node_modules/@preeternal/react-native-document-scanner-plugin/lib/module/index.js b/node_modules/@preeternal/react-native-document-scanner-plugin/lib/module/index.js
+index 7b7bf42..b16e98c 100644
+--- a/node_modules/@preeternal/react-native-document-scanner-plugin/lib/module/index.js
++++ b/node_modules/@preeternal/react-native-document-scanner-plugin/lib/module/index.js
+@@ -235,6 +235,27 @@ export async function scanAndAnalyzeDocument(options) {
+     analysis: analysisResult
+   };
+ }
++
++/**
++ * Android only. Returns the durably persisted scan result for a session id,
++ * allowing recovery after the host process was recreated mid-scan.
++ *
++ * Exposed here because the package's `exports` map blocks deep imports of the
++ * TurboModule, and the default export object below does not forward these
++ * optional methods. Feature-detect before calling: an install whose native
++ * module predates this patch does not expose them.
++ */
++export function consumePendingScanResult(options = {}) {
++  return DocumentScanner.consumePendingScanResult?.(options) ?? Promise.resolve(null);
++}
++
++/**
++ * Android only. Deletes the durably persisted files/manifest for a session id
++ * once JS has confirmed successful consumption.
++ */
++export function discardPendingScanResult(options = {}) {
++  return DocumentScanner.discardPendingScanResult?.(options) ?? Promise.resolve();
++}
+ export { ResponseType, ScanDocumentResponseStatus };
+ export default {
+   analyzeScannedImages,
+diff --git a/node_modules/@preeternal/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts b/node_modules/@preeternal/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
+index 273c8bb..632517e 100644
+--- a/node_modules/@preeternal/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
++++ b/node_modules/@preeternal/react-native-document-scanner-plugin/src/NativeDocumentScanner.ts
+@@ -22,8 +22,24 @@ export interface ScanDocumentOptions {
+    * @default ResponseType.ImageFilePath
+    */
+   responseType?: ResponseType;
++
++  /**
++   * Android only. Opaque id used to durably key the scanned pages so they can
++   * be recovered after the host process is killed and recreated while the
++   * external scanner activity is foregrounded. When omitted, no durable manifest
++   * is written and only the in-memory promise path applies.
++   */
++  scanSessionId?: string;
+ }
+ 
++/**
++ * Result of a durable scan lookup. `null` is resolved when no persisted result
++ * exists for the requested session id.
++ */
++export type PendingScanResult =
++  | { status: 'success'; scannedImages: string[] }
++  | null;
++
+ /**
+  * Supported worker concurrency for image analysis.
+  */
+@@ -310,13 +326,13 @@ export type AnalysisResult = {
+ };
+ 
+ type ScanDocumentSuccess = {
+-  status: ScanDocumentResponseStatus.Success;
++  status: 'success';
+   scannedImages: string[];
+ };
+ 
+ type ScanDocumentCancel = {
+-  status: ScanDocumentResponseStatus.Cancel;
+-  scannedImages: [];
++  status: 'cancel';
++  scannedImages: string[];
+ };
+ 
+ export type ScanDocumentResponse = ScanDocumentSuccess | ScanDocumentCancel;
+@@ -372,6 +388,25 @@ export interface Spec extends TurboModule {
+   analyzeScannedImages(
+     options: AnalyzeScannedImagesRequest
+   ): Promise<AnalysisResult>;
++
++  /**
++   * Android only. Returns the durably persisted scan result for a session id,
++   * allowing recovery after the host process was recreated mid-scan.
++   * @param options `{ scanSessionId }`.
++   * @returns Promise resolving the persisted pages, or null when none exist.
++   */
++  consumePendingScanResult(options: {
++    scanSessionId?: string;
++  }): Promise<PendingScanResult>;
++
++  /**
++   * Android only. Deletes the durably persisted files/manifest for a session id
++   * once JS has confirmed successful consumption.
++   * @param options `{ scanSessionId }`.
++   */
++  discardPendingScanResult(options: {
++    scanSessionId?: string;
++  }): Promise<void>;
+ }
+ 
+ const DocumentScanner =

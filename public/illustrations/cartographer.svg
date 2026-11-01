@@ -1,0 +1,23 @@
+<svg width="200" height="100" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bar chart -->
+  <rect x="45" y="50" width="8" height="20" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <rect x="58" y="35" width="8" height="35" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <rect x="71" y="55" width="8" height="15" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="40" y1="70" x2="85" y2="70" stroke="#083D33" stroke-width="1.5"/>
+  <!-- Connecting dashed line -->
+  <line x1="95" y1="65" x2="115" y2="55" stroke="#083D33" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <!-- Pie chart -->
+  <circle cx="130" cy="50" r="16" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <path d="M130 50 L130 34 A16 16 0 0 1 146 50 Z" fill="#E8F7F0" stroke="#083D33" stroke-width="1.5"/>
+  <!-- Dotted line to nodes -->
+  <line x1="150" y1="50" x2="160" y2="50" stroke="#083D33" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <!-- Nodes -->
+  <circle cx="170" cy="40" r="3" fill="#083D33"/>
+  <circle cx="180" cy="30" r="3" fill="#083D33"/>
+  <circle cx="180" cy="50" r="3" fill="#083D33"/>
+  <circle cx="190" cy="40" r="3" fill="#083D33"/>
+  <line x1="170" y1="40" x2="180" y2="30" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="170" y1="40" x2="180" y2="50" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="180" y1="30" x2="190" y2="40" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="180" y1="50" x2="190" y2="40" stroke="#083D33" stroke-width="1.5"/>
+</svg>

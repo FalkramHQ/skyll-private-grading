@@ -1,0 +1,89 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Data files
+execution/
+src/data/allStudentsData.json
+src/data/teacherData.json
+src/data/partnerg_creds_print.html
+src/data/partnerb_login_aliases.json
+.env
+.env.r2
+src/data/partnerb_creds.json
+src/data/partnerb_login_aliases.json
+
+# Temp files
+*.pdf
+*.jpg
+*.png
+*.zip
+# The Android intake app bundles this tracked launcher and in-app brand asset.
+!apps/
+!apps/intake/
+!apps/intake/assets/
+!apps/intake/assets/skyll-logo.png
+# School partner logos rendered on the landing page. Explicit list only —
+# do not un-ignore the whole directory, so stray files are not swallowed.
+!src/assets/*.png
+!src/assets/*.jpeg
+# Canonical source pages needed by the PartnerB 12th Chemistry visual-review UI.
+!public/partnerb-reference/
+!public/partnerb-reference/12th/
+!public/partnerb-reference/12th/*.jpg
+batch/
+partnerh small batch/
+-quality
+get_data.js
+system_audit.md
+FEATURES.md
+IMPLEMENTATION_PLAN.md
+.vercel/*
+!.vercel/project.json
+.backups/
+.env*
+!.env.example
+tmp/
+.tmp/
+.tmp-npm-cache/
+# Local one-off scripts
+.tmp-*
+**/.tmp-*
+scratch/
+.qoder/
+
+# Playwright MCP screenshots and snapshots
+.playwright-mcp/
+
+# Local decision decks from grilling sessions (/decision-deck)
+.decision-deck/
+
+# Share image is a source asset, not a generated artifact
+!public/og-image.png
+
+# Grading evaluation set (student answer text; keep on private storage)
+.eval/
+
+# Generated per-student learner profiles (student data; lives in the database)
+src/data/learnerDna.json

@@ -1,0 +1,21 @@
+<svg width="200" height="100" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left Island -->
+  <path d="M40 70 Q60 55, 80 70 Z" fill="#E8F7F0" stroke="#083D33" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Right Island -->
+  <path d="M120 70 Q140 55, 160 70 Z" fill="#E8F7F0" stroke="#083D33" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Water line -->
+  <line x1="30" y1="70" x2="170" y2="70" stroke="#083D33" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Bridge Arches -->
+  <path d="M70 65 Q100 50, 130 65" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <path d="M70 60 Q100 45, 130 60" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <!-- Vertical bridge supports -->
+  <line x1="85" y1="53" x2="85" y2="65" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="100" y1="49" x2="100" y2="65" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="115" y1="53" x2="115" y2="65" stroke="#083D33" stroke-width="1.5"/>
+  <!-- Small Trees left -->
+  <path d="M55 60 Q60 50, 65 60 Z" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="60" y1="60" x2="60" y2="65" stroke="#083D33" stroke-width="1.5"/>
+  <!-- Small Trees right -->
+  <path d="M135 60 Q140 50, 145 60 Z" fill="none" stroke="#083D33" stroke-width="1.5"/>
+  <line x1="140" y1="60" x2="140" y2="65" stroke="#083D33" stroke-width="1.5"/>
+</svg>

@@ -87,3 +87,6 @@ scratch/
 
 # Generated per-student learner profiles (student data; lives in the database)
 src/data/learnerDna.json
+
+# NEAR AI smoke-test evidence (scripts/nearPrivateInferenceSmoke.mjs)
+/near-receipt/

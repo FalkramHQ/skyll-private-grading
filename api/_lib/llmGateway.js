@@ -3,6 +3,8 @@
  * Pattern extracted from cohort regrade DeepSeek calls.
  */
 
+import { nearPrivateEnabledForCurrentJob } from '../../apps/processing-worker/inferenceContext.js';
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -52,6 +54,7 @@ async function callJsonModelOnce({
   retryDelayMs,
   apiKey,
   baseUrl,
+  privateInference,
 } = {}) {
   if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured');
   if (!prompt || typeof prompt !== 'string') throw new Error('prompt is required');
@@ -66,30 +69,38 @@ async function callJsonModelOnce({
         : retryDelayMs;
       if (delay > 0) await sleep(delay);
     }
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        temperature,
-        max_tokens: tokenBudget,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: system },
-          {
-            role: 'user',
-            content: attempt === 0
-              ? prompt
-              : truncated
-                ? `${prompt}\n\nYour previous response was cut off before the JSON closed. Return the complete JSON object only, as compactly as possible.`
-                : `${prompt}\n\nYour previous response was invalid JSON. Return a shorter valid JSON object only.`,
-          },
-        ],
-      }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || body.error) {
-      const status = response.status;
+    const requestBody = {
+      model,
+      temperature,
+      max_tokens: tokenBudget,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        {
+          role: 'user',
+          content: attempt === 0
+            ? prompt
+            : truncated
+              ? `${prompt}\n\nYour previous response was cut off before the JSON closed. Return the complete JSON object only, as compactly as possible.`
+              : `${prompt}\n\nYour previous response was invalid JSON. Return a shorter valid JSON object only.`,
+        },
+      ],
+    };
+    let ok;
+    let status;
+    let body;
+    if (privateInference) {
+      ({ ok, status, body } = await privateInference.send(privateInference.config, requestBody));
+    } else {
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(requestBody),
+      });
+      ({ ok, status } = response);
+      body = await response.json().catch(() => ({}));
+    }
+    if (!ok || body.error) {
       const message = body.error?.message || `LLM request failed (${status})`;
       if (status === 429 || status >= 500) {
         lastError = new Error(message);
@@ -121,6 +132,12 @@ async function callJsonModelOnce({
 }
 
 export async function callJsonModel(options = {}) {
+  // A worker job for a school opted into private inference goes to NEAR AI only.
+  if (nearPrivateEnabledForCurrentJob()) {
+    const { nearAiConfig, nearPrivateChatCompletion } = await import('../../apps/processing-worker/nearPrivateInference.js');
+    const config = nearAiConfig();
+    return callJsonModelOnce({ ...options, apiKey: config.apiKey, model: config.model, privateInference: { config, send: nearPrivateChatCompletion } });
+  }
   const fallback = deepinfraReviewEndpoint();
   const hasExplicitEndpoint = Boolean(options.apiKey || options.baseUrl);
   const apiKey = options.apiKey ?? process.env.DEEPSEEK_API_KEY;

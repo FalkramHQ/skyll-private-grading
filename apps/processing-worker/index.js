@@ -41,6 +41,7 @@ import {
   visualAnswerAnchor,
 } from './visualRescue.js';
 import { deepinfraCompatConfig, callDeepinfraModelJson, callGradeJson, callReasoningJson, callReportModulesJson } from './llmGateway.js';
+import { nearPrivateEnabledFor, runWithInferenceContext, setPrivateInferenceSink } from './nearPrivateInference.js';
 import { now, id, parseJson, text, scoreStatus, textList, initialModulesFallback, learningModeIds } from './workerUtils.js';
 import { drainPushOutbox, enqueuePush, ensurePushOutboxTable, pushOutboxStatement, PUSH_EVENT_TYPES } from '../../api/_lib/pushOutbox.js';
 import { createCommsRunner } from '../../server/comms/worker.js';
@@ -95,6 +96,22 @@ let lastHiveSynthesisQueueAt = 0;
 const hiveSynthesisQueueMs = Math.max(60_000, Number(process.env.HIVE_SYNTHESIS_QUEUE_MS || 15 * 60_000));
 const hiveSideJobTypes = new Set(['deep_signal_extraction', 'hive_synthesis', 'mastery_estimation']);
 const alerts = createAlerter();
+
+// Verified NEAR AI attestations and per-response receipts (migration 091).
+setPrivateInferenceSink({
+  attestation: (a) => db.execute({
+    sql: `INSERT OR IGNORE INTO private_inference_attestations (id, provider, model, nonce, report_sha256, report_json, summary_json, verified_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [a.id, a.provider, a.model, a.nonce, a.report_sha256, a.report_json, JSON.stringify(a.summary), a.verified_at],
+  }),
+  receipt: (r) => db.execute({
+    sql: `INSERT INTO private_inference_receipts (id, attestation_id, school, test_id, job_id, job_type, provider, model, completion_id,
+            request_sha256, response_sha256, signature_kind, signed_text, signature, signing_address, signing_algo, tcb_status, gpu_verified, verified_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [r.id, r.attestation_id, r.school, r.test_id, r.job_id, r.job_type, r.provider, r.model, r.completion_id,
+      r.request_sha256, r.response_sha256, r.signature_kind, r.signed_text, r.signature, r.signing_address, r.signing_algo, r.tcb_status, r.gpu_verified ? 1 : 0, r.verified_at],
+  }),
+});
 
 async function generateInitialReportModules({ student, subjectName, questions }) {
   const fallback = initialModulesFallback(questions);
@@ -219,7 +236,7 @@ async function processCohortRegrade() {
   const scope = JSON.parse(run.scope || '{}');
   console.log(JSON.stringify({ event: 'cohort_regrade_claimed', runId: run.id, testId: scope.test_id }));
   try {
-    const result = await processCohortRegradeStep(db, { username: 'oci_worker', role: 'skyll_admin', school: scope.school || '' }, run);
+    const result = await runWithInferenceContext({ jobId: run.id, jobType: 'cohort_regrade', school: scope.school || '', testId: scope.test_id || null }, () => processCohortRegradeStep(db, { username: 'oci_worker', role: 'skyll_admin', school: scope.school || '' }, run));
     await db.execute({ sql: 'UPDATE regrade_runs SET heartbeat_at = ? WHERE id = ?', args: [now(), run.id] });
     console.log(JSON.stringify({ event: 'cohort_regrade_step_completed', runId: run.id, status: result.run.status }));
   } catch (error) {
@@ -1284,9 +1301,14 @@ async function processVisualRescue(job) {
   const evidence = parseJson(question.evidence_json, {});
   const rubric = parseJson(question.rubric_json, {});
   let visual = { attempted: true, usable: false, description: '', model: null, reason: 'No vision provider is configured.' };
-  const candidates = await visualCandidateUrls(question, { maxPages: 3 });
+  // Vision rescue runs on non-TEE providers, so a private-inference school gets
+  // the teacher-review path instead of sending scan images out.
+  const privateOnly = nearPrivateEnabledFor(job.school);
+  const candidates = privateOnly ? [] : await visualCandidateUrls(question, { maxPages: 3 });
   const attempts = [];
-  if (!candidates.length) {
+  if (privateOnly) {
+    visual.reason = 'Visual rescue skipped: this school grades with private inference only.';
+  } else if (!candidates.length) {
     visual.reason = 'No question-linked source scan pages were available for visual rescue.';
   } else {
     // Try highest-ranked page first (OCR label match), then next candidates.
@@ -2093,16 +2115,18 @@ async function tick() {
   });
   try {
     await heartbeatJob(job, 'processing');
-    if (job.type === 'mistral_ocr') await processOcr(job);
-    else if (job.type === 'build_rubric') await processRubric(job);
-    else if (job.type === 'materialize_evidence') await processEvidence(job);
-    else if (job.type === 'visual_rescue') await processVisualRescue(job);
-    else if (job.type === 'grade_submission') await processGrade(job);
-    else if (job.type === 'build_reports') await processReports(job);
-    else if (job.type === 'deep_signal_extraction') await processDeepSignals(job);
-    else if (job.type === 'hive_synthesis') await processHiveSynthesis(job);
-    else if (job.type === 'mastery_estimation') await processMastery(job);
-    else throw new Error(`Unsupported job type: ${job.type}`);
+    await runWithInferenceContext({ jobId: job.id, jobType: job.type, school: job.school, testId: job.test_id }, async () => {
+      if (job.type === 'mistral_ocr') await processOcr(job);
+      else if (job.type === 'build_rubric') await processRubric(job);
+      else if (job.type === 'materialize_evidence') await processEvidence(job);
+      else if (job.type === 'visual_rescue') await processVisualRescue(job);
+      else if (job.type === 'grade_submission') await processGrade(job);
+      else if (job.type === 'build_reports') await processReports(job);
+      else if (job.type === 'deep_signal_extraction') await processDeepSignals(job);
+      else if (job.type === 'hive_synthesis') await processHiveSynthesis(job);
+      else if (job.type === 'mastery_estimation') await processMastery(job);
+      else throw new Error(`Unsupported job type: ${job.type}`);
+    });
     await releaseCompletedJob(job);
     const outcome = await db.execute({ sql: 'SELECT status, last_error_code FROM processing_jobs WHERE id = ?', args: [job.id] }).catch(() => ({ rows: [] }));
     const finalStatus = outcome.rows[0]?.status || 'succeeded';

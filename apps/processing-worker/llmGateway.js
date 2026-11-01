@@ -2,6 +2,7 @@
 // Extracted from index.js for maintainability.
 
 import { parseJsonModelResponse } from '../../workers/mistral-ocr/src/ocrProtocol.js';
+import { nearAiConfig, nearPrivateChatCompletion, nearPrivateEnabledForCurrentJob } from './nearPrivateInference.js';
 
 /** OpenAI-compatible DeepSeek chat endpoint. Prefer Phala when configured. */
 export function deepseekCompatConfig({ purpose = 'reasoning' } = {}) {
@@ -58,27 +59,36 @@ async function callReasoningJsonOnEndpoint(endpoint, prompt, maxTokens, reasonin
       : `${prompt}\n\nCRITICAL: Your previous reply was invalid or truncated JSON (${parseError?.message || 'parse error'}). Return one COMPLETE valid JSON object only. Keep each student_answer under 800 characters. Do not cut off mid-string.`;
     // After a truncation/parse miss, leave more room for the JSON payload.
     const attemptMaxTokens = attempt === 0 ? maxTokens : Math.min(16000, Math.max(maxTokens, Math.ceil(maxTokens * 1.25)));
-    let response;
+    const requestBody = {
+      model: endpoint.model,
+      temperature: 0,
+      max_tokens: attemptMaxTokens,
+      ...(endpoint.provider === 'deepseek' ? { reasoning_effort: reasoningEffort } : {}),
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: 'Return one complete, strictly valid JSON object. Never invent student work. Escape all strings correctly and do not truncate the JSON.' }, { role: 'user', content: userContent }],
+    };
+    let ok;
+    let status;
+    let body;
+    let receipt = null;
     try {
-      response = await fetch(endpoint.url, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${endpoint.apiKey}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: endpoint.model,
-          temperature: 0,
-          max_tokens: attemptMaxTokens,
-          ...(endpoint.provider === 'deepseek' ? { reasoning_effort: reasoningEffort } : {}),
-          response_format: { type: 'json_object' },
-          messages: [{ role: 'system', content: 'Return one complete, strictly valid JSON object. Never invent student work. Escape all strings correctly and do not truncate the JSON.' }, { role: 'user', content: userContent }],
-        }),
-        signal: controller.signal,
-      });
+      if (endpoint.provider === 'nearai') {
+        ({ ok, status, body, receipt } = await nearPrivateChatCompletion(endpoint, requestBody, { signal: controller.signal }));
+      } else {
+        const response = await fetch(endpoint.url, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${endpoint.apiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        });
+        ({ ok, status } = response);
+        body = await response.json().catch(() => ({}));
+      }
     } catch (err) {
       if (err.name === 'AbortError') throw new Error('Reasoning model timed out (120s)');
       throw err;
     } finally { clearTimeout(timeout); }
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok || body.error) throw new Error(body?.error?.message || `Reasoning model failed (${response.status})`);
+    if (!ok || body.error) throw new Error(body?.error?.message || `Reasoning model failed (${status})`);
     const message = body?.choices?.[0]?.message || {};
     const finishReason = body?.choices?.[0]?.finish_reason || '';
     const responseContent = typeof message.content === 'string'
@@ -92,7 +102,7 @@ async function callReasoningJsonOnEndpoint(endpoint, prompt, maxTokens, reasonin
       continue;
     }
     try {
-      const parsed = { value: parseJsonModelResponse(content), model: body.model || endpoint.model, usage: body.usage || null };
+      const parsed = { value: parseJsonModelResponse(content), model: body.model || endpoint.model, usage: body.usage || null, ...(receipt ? { receipt } : {}) };
       // Truncated-but-parseable JSON often drops trailing answers — retry unless last attempt.
       if (finishReason === 'length' && attempt < attempts - 1) {
         parseError = new Error('Reasoning model output truncated (finish_reason=length); retrying with tighter answers.');
@@ -124,6 +134,7 @@ export async function callDeepinfraModelJson(model, prompt, maxTokens = 4000) {
  * a 5xx, the call falls back to that chain so grading never stops on a model switch.
  */
 export async function callGradeJson(prompt, maxTokens = 8000) {
+  if (nearPrivateEnabledForCurrentJob()) return callReasoningJson(prompt, maxTokens);
   const model = String(process.env.GRADE_MODEL || '').trim();
   if (!model || !process.env.DEEPINFRA_API_KEY) return callReasoningJson(prompt, maxTokens);
   try {
@@ -136,6 +147,8 @@ export async function callGradeJson(prompt, maxTokens = 8000) {
 }
 
 export async function callReasoningJson(prompt, maxTokens = 4000, reasoningEffort = 'low') {
+  // A school opted into private inference never falls back to a non-TEE provider.
+  if (nearPrivateEnabledForCurrentJob()) return callReasoningJsonOnEndpoint(nearAiConfig(), prompt, maxTokens, reasoningEffort);
   const deepseek = deepseekCompatConfig({ purpose: 'reasoning' });
   const deepinfra = deepinfraCompatConfig({ purpose: 'reasoning' });
   const chain = [];
@@ -237,6 +250,7 @@ export async function callReportModulesJson(prompt, maxTokens) {
       throw new Error(`Primary report model failed (${String(primaryError.message || primaryError)}); MiMo fallback failed (${String(fallbackError.message || fallbackError)})`);
     }
   };
+  if (nearPrivateEnabledForCurrentJob()) return callReasoningJson(prompt, maxTokens);
   if (provider === 'mimo') return callMimoJson(prompt, maxTokens);
   if (provider === 'qwen') {
     try {

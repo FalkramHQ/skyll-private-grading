@@ -1,0 +1,21 @@
+{
+  "id": "pir_66715e18-6c8d-438a-9b89-2bea96897408",
+  "attestation_id": "att_38a9181c6f1844bc48a7005e",
+  "school": "Smoke Test School",
+  "test_id": null,
+  "job_id": "smoke",
+  "job_type": "smoke",
+  "provider": "nearai",
+  "model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+  "completion_id": "chatcmpl-ce5cf551-881c-493f-b43e-969a78c50119",
+  "request_sha256": "334a9a3ae89f297bc236a6be8424d3bd625365c860d9b5ea4153506cf020bd0d",
+  "response_sha256": "0bd49c5e002e373767aa703c2d07a1b3777aa5223aeb8781d86eeae517f6a2a2",
+  "signature_kind": "provider_tee",
+  "signed_text": "deepseek-ai/DeepSeek-V4.1-Flash-1017:334a9a3ae89f297bc236a6be8424d3bd625365c860d9b5ea4153506cf020bd0d:0bd49c5e002e373767aa703c2d07a1b3777aa5223aeb8781d86eeae517f6a2a2",
+  "signature": "0xdc8b9212a081dc946c3c3aec35de29141b73da63ec543114451cfa04245be7ec0f1cdbef8e2f31257bcb11ff9f6851ea79e145fa603e969fde871cf7d6d2aec31c",
+  "signing_address": "0xfe0071895500a9755c18044948ab4f4e1a7f337e",
+  "signing_algo": "ecdsa",
+  "tcb_status": "UpToDate",
+  "gpu_verified": true,
+  "verified_at": "2026-11-01T16:06:38.133Z"
+}

@@ -84,7 +84,19 @@ These cover signature checks (TEE and gateway signatures, tampered bytes, keys n
 - **Not covered: OCR.** Scans are still read by an OCR service outside a TEE. Our rules forbid vision-language models for text extraction, so NEAR's vision model is not a drop-in replacement. This is the next gap to close.
 - **Not covered: Skyll itself.** Skyll stores the papers and grades, and teachers see them. That is the service a school signs up for.
 - **DPDP.** Private inference helps meet the DPDP Act's duty of reasonable security safeguards for children's data, and it limits what our AI vendor can see. It does not on its own make a product DPDP compliant: consent, retention and breach handling are separate obligations.
-- **Rollout.** Private inference is off by default. We switch it on per school only after our grading evaluation shows grades match our current baseline.
+- **Rollout.** Private inference is off by default and is switched on per school.
+
+## Grading quality: no cost to accuracy
+
+We re-graded our evaluation set of **2,103 real exam questions** (human-adjudicated marks, de-identified, kept off GitHub) through NEAR AI private inference, and compared the result with a fresh run of current production on 2 Nov 2026:
+
+| | Production (non-private) | NEAR AI private inference |
+|---|---|---|
+| Within one mark of the human mark | 88.2% | **88.4%** |
+| Exact mark | 84.2% | 84.1% |
+| Mean signed error | −0.017 marks | −0.016 marks |
+
+No subject with 50 or more questions dropped more than 2 points, which is the gate we apply to every grading change. Physics rose 1.7 points and Mathematics fell 1.9. All 2,123 grading calls carried a verified TEE receipt. The full run cost about $1.25 in NEAR AI credits.
 
 ## Third-party libraries added for this work
 

@@ -25,6 +25,7 @@ export { currentInferenceContext, nearPrivateEnabledFor, nearPrivateEnabledForCu
 const NRAS_URL = 'https://nras.attestation.nvidia.com/v3/attest/gpu';
 let sink = { attestation: async () => {}, receipt: async () => {} };
 let cachedAttestation = null;
+let pendingAttestation = null;
 
 export class PrivateInferenceVerificationError extends Error {
   constructor(message) {
@@ -50,6 +51,8 @@ export function nearAiConfig() {
     baseUrl: (process.env.NEAR_AI_BASE_URL || 'https://cloud-api.near.ai/v1').replace(/\/+$/, ''),
     apiKey,
     model: process.env.NEAR_AI_MODEL || 'deepseek-ai/DeepSeek-V4.1-Flash-1017',
+    // NEAR's DeepSeek thinks by default; production grades without thinking, so match it.
+    thinking: process.env.NEAR_AI_THINKING === '1',
   };
 }
 
@@ -189,6 +192,12 @@ export async function verifiedAttestation(config = nearAiConfig(), { force = fal
   if (!force && cachedAttestation && cachedAttestation.model === config.model && Date.now() - cachedAttestation.verifiedAtMs < ttl) {
     return cachedAttestation;
   }
+  // Concurrent callers share one in-flight attestation instead of each fetching their own.
+  pendingAttestation ||= fetchVerifiedAttestation(config).finally(() => { pendingAttestation = null; });
+  return pendingAttestation;
+}
+
+async function fetchVerifiedAttestation(config) {
   const nonce = randomBytes(32).toString('hex');
   const query = new URLSearchParams({ model: config.model, provider: 'near', signing_algo: 'ecdsa', nonce, include_tls_fingerprint: 'false' });
   const { response, bytes, body } = await nearFetch(config, `/attestation/report?${query}`);
@@ -269,7 +278,11 @@ async function fetchSignature(config, completionId, model) {
  */
 export async function nearPrivateChatCompletion(config, requestBody, { signal } = {}) {
   const attestation = await verifiedAttestation(config);
-  const requestBytes = Buffer.from(JSON.stringify({ ...requestBody, model: config.model }), 'utf8');
+  const requestBytes = Buffer.from(JSON.stringify({
+    chat_template_kwargs: { thinking: Boolean(config.thinking) },
+    ...requestBody,
+    model: config.model,
+  }), 'utf8');
   const { response, bytes: responseBytes, body } = await nearFetch(config, '/chat/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

@@ -18,9 +18,22 @@ const receipt = await readJson('receipt.json');
 const [requestBytes, responseBytes] = await Promise.all([readOptional('request.json'), readOptional('response.json')]);
 
 const step = (label) => console.log(`✓ ${label}`);
+
+// Quote and GPU checks fetch Intel collateral and call NVIDIA NRAS; retry their network blips,
+// never a failed check.
+async function withNetworkRetry(fn, tries = 4) {
+  for (let attempt = 1; ; attempt += 1) {
+    try { return await fn(); } catch (error) {
+      if (attempt >= tries || !/fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|returned 5\d\d/i.test(String(error.message))) throw error;
+      console.log(`• network error (${error.message}); retrying`);
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+    }
+  }
+}
+
 try {
   if (receipt.attestation_id !== attestation.id) throw new Error('receipt names a different attestation');
-  const signers = await verifyAttestationReport(attestation.report, attestation.nonce, receipt.model);
+  const signers = await withNetworkRetry(() => verifyAttestationReport(attestation.report, attestation.nonce, receipt.model));
   step(`gateway TEE quote verified (Intel TDX, TCB ${signers.gateway.tcb_status}), key ${signers.gateway.signing_address}`);
   for (const model of signers.models) {
     step(`model TEE quote verified (Intel TDX, TCB ${model.tcb_status}${model.gpu_verified ? ', NVIDIA GPU attested' : ''}), key ${model.signing_address}`);

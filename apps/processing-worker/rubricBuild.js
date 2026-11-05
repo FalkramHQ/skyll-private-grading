@@ -3,6 +3,7 @@
 // the same way. Moved verbatim from apps/processing-worker/index.js.
 import { markingRubricPolicy, parseJsonModelResponse } from '../../workers/mistral-ocr/src/ocrProtocol.js';
 import { deepinfraCompatConfig, deepseekCompatConfig, isProviderBalanceError, callReasoningJson } from './llmGateway.js';
+import { nearPrivateEnabledForCurrentJob } from './inferenceContext.js';
 import { sourceOcrText } from './ocrText.js';
 
 /**
@@ -45,6 +46,10 @@ export function shouldTryNextProvider(error) {
  * @returns {Promise<{parsed: object, model: string, payload: object}>}
  */
 export async function requestRubricPackage(prompt, { testId = null } = {}) {
+  if (nearPrivateEnabledForCurrentJob()) {
+    const { value, model, usage } = await callReasoningJson(prompt, 16000, 'low');
+    return { parsed: value, model, payload: { model, usage } };
+  }
   async function requestRubricJson(url, apiKey, model, extra = {}) {
     const response = await fetch(url, {
       method: 'POST',

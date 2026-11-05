@@ -17,6 +17,7 @@ import {
   postQuizGen,
 } from '../../server/ai/teacher.js';
 import { handleCors } from '../_lib/cors.js';
+import { withRequestInferenceContext } from '../_lib/privateInferenceRequest.js';
 
 const handlers = {
   health,
@@ -69,5 +70,5 @@ export default async function handler(req, res) {
       supportedRoutes: Object.keys(handlers),
     });
   }
-  return selected(req, res);
+  return withRequestInferenceContext(req, `ai:${route}`, () => selected(req, res));
 }

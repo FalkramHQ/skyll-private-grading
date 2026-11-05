@@ -15,14 +15,41 @@ export function currentInferenceContext() {
   return inferenceContext.getStore() || {};
 }
 
-/** True when NEAR_AI_SCHOOLS names this school ("*" opts in every school). */
-export function nearPrivateEnabledFor(school) {
-  if (!process.env.NEAR_AI_API_KEY) return false;
-  const schools = String(process.env.NEAR_AI_SCHOOLS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (schools.includes('*')) return true;
-  return Boolean(school) && schools.includes(String(school).trim().toLowerCase());
+function optedInSchools() {
+  return String(process.env.NEAR_AI_SCHOOLS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+/**
+ * True when NEAR_AI_SCHOOLS names this school, by name or id ("*" opts in every school).
+ * A named school without a NEAR AI key throws: falling back would send its data elsewhere.
+ */
+export function nearPrivateEnabledFor(school, schoolId) {
+  const schools = optedInSchools();
+  const listed = schools.includes('*')
+    || [school, schoolId].some((value) => value && schools.includes(String(value).trim().toLowerCase()));
+  if (listed && !process.env.NEAR_AI_API_KEY) throw new Error('NEAR_AI_SCHOOLS names this school but NEAR_AI_API_KEY is not set.');
+  return listed;
+}
+
+/** Whether a context's model calls take the private path. forcePrivate counts only once a school is opted in. */
+export function nearPrivateEnabledForContext({ school, schoolId, forcePrivate } = {}) {
+  if (forcePrivate && optedInSchools().length) {
+    if (!process.env.NEAR_AI_API_KEY) throw new Error('NEAR_AI_SCHOOLS is set but NEAR_AI_API_KEY is not.');
+    return true;
+  }
+  return nearPrivateEnabledFor(school, schoolId);
 }
 
 export function nearPrivateEnabledForCurrentJob() {
-  return nearPrivateEnabledFor(currentInferenceContext().school);
+  return nearPrivateEnabledForContext(currentInferenceContext());
+}
+
+/**
+ * Once any school is opted in, a model call must say whose data it carries. Without
+ * this, a new route that forgot its context would quietly skip the private path.
+ */
+export function assertPrivateRoutingKnown() {
+  if (optedInSchools().length && !inferenceContext.getStore()) {
+    throw new Error('Model call without an inference context while NEAR_AI_SCHOOLS is set.');
+  }
 }

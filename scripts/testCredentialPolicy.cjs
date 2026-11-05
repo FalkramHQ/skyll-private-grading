@@ -13,18 +13,18 @@ const {
   institutionSlug,
 } = require('./lib/credentialPolicy.cjs');
 
-assert.equal(institutionSlug('Partner Academy E'), 'partnere');
+assert.equal(institutionSlug('Partner Academy E'), 'partner_academy_e');
 assert.equal(institutionSlug("Partner Academy B"), 'partner_academy_b');
 assertStudentCredential({ username: 'manang', password: createStudentPassword() });
 assert.throws(() => assertStudentCredential({ username: 'too-long', password: 'ABC123' }));
 assert.throws(() => assertStudentCredential({ username: 'manang', password: 'short' }));
-assertAdminCredential({ school: 'Partner Academy E', username: 'partnere_admin', password: createAdminPassword() });
+assertAdminCredential({ school: 'Partner Academy E', username: 'partner_academy_e_admin', password: createAdminPassword() });
 assertAdminCredential({ school: "Partner Academy B", username: 'partner_academy_b_admin', password: createAdminPassword() });
 assert.throws(() => assertAdminCredential({ school: 'Partner Academy E', username: 'admin', password: createAdminPassword() }));
-assert.throws(() => assertAdminCredential({ school: 'Partner Academy E', username: 'partnere_admin', password: 'not-valid!' }));
-assertScannerCredential({ school: "Partner Academy A", username: 'partnera_scanner', password: createAdminPassword() });
-assert.throws(() => assertScannerCredential({ school: "Partner Academy A", username: 'partnera_admin', password: createAdminPassword() }));
-assert.throws(() => assertScannerCredential({ school: "Partner Academy A", username: 'partnera_scanner', password: 'short' }));
+assert.throws(() => assertAdminCredential({ school: 'Partner Academy E', username: 'partner_academy_e_admin', password: 'not-valid!' }));
+assertScannerCredential({ school: "Partner Academy A", username: 'partner_academy_a_scanner', password: createAdminPassword() });
+assert.throws(() => assertScannerCredential({ school: "Partner Academy A", username: 'partner_academy_a_admin', password: createAdminPassword() }));
+assert.throws(() => assertScannerCredential({ school: "Partner Academy A", username: 'partner_academy_a_scanner', password: 'short' }));
 
 const projectRoot = path.resolve(__dirname, '..');
 const trackedFiles = execFileSync('git', ['ls-files', '-z'], { cwd: projectRoot })

@@ -17,8 +17,8 @@ function response() {
 
 describe('normalizeRosterName', () => {
   it('treats Shrivastava and Srivastava as the same roster name', () => {
-    expect(normalizeRosterName('Ishaan Shrivastava')).toBe(normalizeRosterName('Ishaan Srivastava'));
-    expect(normalizeRosterName('  Khushbu   Yadav ')).toBe('khushbu yadav');
+    expect(normalizeRosterName('Demo Shrivastava')).toBe(normalizeRosterName('Demo Srivastava'));
+    expect(normalizeRosterName('  Sample   Teacher ')).toBe('sample teacher');
   });
 });
 
@@ -75,11 +75,11 @@ describe('teacher roster authorization', () => {
   it('refuses creating a student when an active roster name already exists', async () => {
     db.execute
       .mockResolvedValueOnce({ rows: [{ id: 'batch_1', grade: '9th', academic_year_id: null }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'student_1', display_name: 'Ishaan Srivastava', username: 'rksykz' }] });
+      .mockResolvedValueOnce({ rows: [{ id: 'student_1', display_name: 'Demo Srivastava', username: 'rksykz' }] });
     const res = response();
     await teacherRoster({
       method: 'POST',
-      body: { resource: 'student', name: 'Ishaan Shrivastava', batchIds: ['batch_1'] },
+      body: { resource: 'student', name: 'Demo Shrivastava', batchIds: ['batch_1'] },
     }, res);
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.body.error).toMatch(/already exists/i);

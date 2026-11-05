@@ -5,6 +5,9 @@ import { handleCors } from './_lib/cors.js';
 import { checkRateLimit } from './_lib/rateLimit.js';
 import { resolveSchoolId } from './_lib/canonicalSubmissions.js';
 import { internalError } from './_lib/httpError.js';
+import { callJsonModel } from './_lib/llmGateway.js';
+import { enablePrivateInferenceFor, inferenceContextForUser } from './_lib/privateInferenceRequest.js';
+import { nearPrivateEnabledForCurrentJob, runWithInferenceContext } from '../apps/processing-worker/inferenceContext.js';
 
 const client = tursoUrl ? createClient({ url: tursoUrl, authToken: tursoAuthToken }) : null;
 
@@ -46,6 +49,10 @@ ${JSON.stringify(FILTER_SCHEMA, null, 2)}`;
 const NLQ_TIMEOUT_MS = 30_000;
 
 async function translateQuery(naturalQuery, today) {
+  if (nearPrivateEnabledForCurrentJob()) {
+    const { result } = await callJsonModel({ prompt: naturalQuery, system: SYSTEM_PROMPT.replace('{{TODAY}}', today), maxTokens: 300, temperature: 0 });
+    return result;
+  }
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
   // TODO(privacy): teacher queries can carry student names, and
@@ -231,7 +238,9 @@ export default async function handler(req, res) {
     // 1. Translate natural language → filter JSON
     let filter;
     try {
-      filter = await translateQuery(q.trim(), today);
+      const context = inferenceContextForUser(actor, 'query');
+      await enablePrivateInferenceFor(context);
+      filter = await runWithInferenceContext(context, () => translateQuery(q.trim(), today));
     } catch (error) {
       // Upstream detail stays in the logs; the UI falls back to manual filters.
       console.error('[query] translation failed:', error);

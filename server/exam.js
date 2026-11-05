@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { database, ensureAuthTables, requireUser } from '../api/_lib/auth.js';
 import { putObject, safeFilename } from '../api/_lib/storage.js';
+import { enablePrivateInferenceFor } from '../api/_lib/privateInferenceRequest.js';
+import { nearPrivateEnabledFor, runWithInferenceContext } from '../apps/processing-worker/inferenceContext.js';
 
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
 const MAX_PDF_BASE64_CHARS = Math.ceil((MAX_PDF_BYTES * 4) / 3) + 16;
@@ -82,6 +84,16 @@ async function mistralRequest(path, body, timeoutMs = 120_000) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// Exam Notes stays on the signed-in user's own school, so that school decides the route.
+async function nearExamRequest(user, body) {
+  const context = { school: user.school, schoolId: user.school_id, jobType: 'exam-notes' };
+  await enablePrivateInferenceFor(context);
+  const { nearAiConfig, nearPrivateChatCompletion } = await import('../apps/processing-worker/nearPrivateInference.js');
+  const { ok, status, body: payload } = await runWithInferenceContext(context, () => nearPrivateChatCompletion(nearAiConfig(), body));
+  if (!ok) throw new Error(payload?.error?.message || `Private AI request failed (${status})`);
+  return payload;
 }
 
 async function deepSeekRequest(body, timeoutMs = 180_000) {
@@ -169,6 +181,11 @@ export default async function handler(req, res) {
       const buffer = Buffer.from(encodedFile, 'base64');
       if (!buffer.length || buffer.length > MAX_PDF_BYTES) return fail(res, 400, 'PDF must be between 1 byte and 8 MB.');
       if (buffer.subarray(0, 5).toString() !== '%PDF-') return fail(res, 400, 'The uploaded file is not a valid PDF.');
+      // Private OCR renders pages on the worker. Sending the PDF to Mistral from here would
+      // take it out of the TEE, so a private school pastes its notes instead.
+      if (nearPrivateEnabledFor(user.school, user.school_id)) {
+        return fail(res, 409, 'PDF upload is off for schools on private AI. Paste the notes as text instead.');
+      }
       const ocr = await mistralRequest('/v1/ocr', {
         model: process.env.MISTRAL_OCR_MODEL || 'mistral-ocr-latest',
         document: { type: 'document_url', document_url: `data:application/pdf;base64,${buffer.toString('base64')}` },
@@ -198,7 +215,8 @@ export default async function handler(req, res) {
       if (!prompt) return fail(res, 400, 'Describe the paper you want to create.');
       if (prompt.length > MAX_PROMPT_CHARS) return fail(res, 400, 'Prompt is too long.');
       const source = notes.slice(0, MAX_NOTE_CHARS);
-      const completion = await deepSeekRequest({
+      const send = nearPrivateEnabledFor(user.school, user.school_id) ? (body) => nearExamRequest(user, body) : deepSeekRequest;
+      const completion = await send({
         model: process.env.DEEPSEEK_EXAM_MODEL || 'deepseek-v4-flash',
         temperature: 0.35,
         max_tokens: 8_000,

@@ -1,6 +1,8 @@
 import { createClient } from '@libsql/client';
 import { documentForAsset, isRetryableMistralStatus, normalizeOcrResult, validateRubricPackage } from '../../workers/mistral-ocr/src/ocrProtocol.js';
 import { assetFilename, ocrWithDatalab, resolveOcrEngine } from './datalabOcr.js';
+import { NEAR_OCR_MODEL, ocrWithNearAi } from './nearOcr.js';
+import { privateInferenceDbSink } from './privateInferenceSink.js';
 import { createAlerter } from '../../shared/alerts.js';
 import { UNCLEAR_SYMBOLS_TAG } from '../../shared/gradingCalibration.js';
 import { createHousekeeper } from './housekeeping.js';
@@ -41,7 +43,7 @@ import {
   visualAnswerAnchor,
 } from './visualRescue.js';
 import { deepinfraCompatConfig, callDeepinfraModelJson, callGradeJson, callReasoningJson, callReportModulesJson } from './llmGateway.js';
-import { nearPrivateEnabledFor, runWithInferenceContext, setPrivateInferenceSink } from './nearPrivateInference.js';
+import { nearAiConfig, nearPrivateChatCompletion, nearPrivateEnabledForCurrentJob, runWithInferenceContext, setPrivateInferenceSink } from './nearPrivateInference.js';
 import { now, id, parseJson, text, scoreStatus, textList, initialModulesFallback, learningModeIds } from './workerUtils.js';
 import { drainPushOutbox, enqueuePush, ensurePushOutboxTable, pushOutboxStatement, PUSH_EVENT_TYPES } from '../../api/_lib/pushOutbox.js';
 import { createCommsRunner } from '../../server/comms/worker.js';
@@ -98,20 +100,14 @@ const hiveSideJobTypes = new Set(['deep_signal_extraction', 'hive_synthesis', 'm
 const alerts = createAlerter();
 
 // Verified NEAR AI attestations and per-response receipts (migration 091).
-setPrivateInferenceSink({
-  attestation: (a) => db.execute({
-    sql: `INSERT OR IGNORE INTO private_inference_attestations (id, provider, model, nonce, report_sha256, report_json, summary_json, verified_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [a.id, a.provider, a.model, a.nonce, a.report_sha256, a.report_json, JSON.stringify(a.summary), a.verified_at],
-  }),
-  receipt: (r) => db.execute({
-    sql: `INSERT INTO private_inference_receipts (id, attestation_id, school, test_id, job_id, job_type, provider, model, completion_id,
-            request_sha256, response_sha256, signature_kind, signed_text, signature, signing_address, signing_algo, tcb_status, gpu_verified, verified_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [r.id, r.attestation_id, r.school, r.test_id, r.job_id, r.job_type, r.provider, r.model, r.completion_id,
-      r.request_sha256, r.response_sha256, r.signature_kind, r.signed_text, r.signature, r.signing_address, r.signing_algo, r.tcb_status, r.gpu_verified ? 1 : 0, r.verified_at],
-  }),
-});
+setPrivateInferenceSink(privateInferenceDbSink(db));
+
+// Job rows carry a school's display name, which has historical spellings, so opt-in also
+// matches on the canonical id. Looked up only once some school is opted in.
+async function inferenceSchoolId(school) {
+  if (!process.env.NEAR_AI_SCHOOLS || !school) return null;
+  return resolveSchoolId(db, school).catch(() => null);
+}
 
 async function generateInitialReportModules({ student, subjectName, questions }) {
   const fallback = initialModulesFallback(questions);
@@ -236,7 +232,7 @@ async function processCohortRegrade() {
   const scope = JSON.parse(run.scope || '{}');
   console.log(JSON.stringify({ event: 'cohort_regrade_claimed', runId: run.id, testId: scope.test_id }));
   try {
-    const result = await runWithInferenceContext({ jobId: run.id, jobType: 'cohort_regrade', school: scope.school || '', testId: scope.test_id || null }, () => processCohortRegradeStep(db, { username: 'oci_worker', role: 'skyll_admin', school: scope.school || '' }, run));
+    const result = await runWithInferenceContext({ jobId: run.id, jobType: 'cohort_regrade', school: scope.school || '', schoolId: await inferenceSchoolId(scope.school), testId: scope.test_id || null }, () => processCohortRegradeStep(db, { username: 'oci_worker', role: 'skyll_admin', school: scope.school || '' }, run));
     await db.execute({ sql: 'UPDATE regrade_runs SET heartbeat_at = ? WHERE id = ?', args: [now(), run.id] });
     console.log(JSON.stringify({ event: 'cohort_regrade_step_completed', runId: run.id, status: result.run.status }));
   } catch (error) {
@@ -472,8 +468,13 @@ async function callDatalab(asset) {
   });
 }
 
-async function runOcrEngine(asset) {
-  return ocrEngine === 'mistral' ? callMistral(asset) : callDatalab(asset);
+async function callNearOcr(asset) {
+  return ocrWithNearAi({ buffer: await downloadAssetBytes(asset), mimeType: asset.mimeType });
+}
+
+async function runOcrEngine(asset, engine) {
+  if (engine === 'near_vl') return callNearOcr(asset);
+  return engine === 'mistral' ? callMistral(asset) : callDatalab(asset);
 }
 
 async function hasActiveArtifact(asset) {
@@ -901,7 +902,9 @@ async function processOcr(job) {
   await startStep(job.id, 'validate_inputs', 'Loading private source files directly from R2');
   const assets = await assetsForOcr(job.test_id); if (!assets.length) throw new Error('No uploaded source files are available for OCR.');
   await completeStep(job.id, 'validate_inputs', `${assets.length} uploaded source file(s) verified`);
-  await startStep(job.id, 'ocr', `${ocrEngine === 'datalab' ? 'Datalab' : 'Mistral'} OCR running for ${assets.length} source file(s)`);
+  const engine = nearPrivateEnabledForCurrentJob() ? 'near_vl' : ocrEngine;
+  const engineLabel = { near_vl: 'Private', datalab: 'Datalab', mistral: 'Mistral' }[engine];
+  await startStep(job.id, 'ocr', `${engineLabel} OCR running for ${assets.length} source file(s)`);
   const payload = parseJson(job.payload_json); let processed = 0; let reused = 0;
   const requiredKinds = new Set(['question_paper', 'answer_key']);
   const failedRequired = [];
@@ -922,7 +925,7 @@ async function processOcr(job) {
       continue;
     }
     let result;
-    try { result = await runOcrEngine(asset); }
+    try { result = await runOcrEngine(asset, engine); }
     catch (err) {
       console.warn(JSON.stringify({ event: 'ocr_asset_failed', assetId: asset.id, kind: asset.kind, student: asset.student, retryable: err?.retryable !== false, error: err.message }));
       (requiredKinds.has(asset.kind) ? failedRequired : failedOptional).push({ id: asset.id, kind: asset.kind, student: asset.student, reason: err.message, retryable: err?.retryable });
@@ -935,7 +938,7 @@ async function processOcr(job) {
       (requiredKinds.has(asset.kind) ? failedRequired : failedOptional).push({ id: asset.id, kind: asset.kind, student: asset.student, reason: 'OCR returned no readable content', retryable: true });
       continue;
     }
-    await saveArtifact(job.id, asset, result, { engine: ocrEngine, model: result.model }); processed += 1;
+    await saveArtifact(job.id, asset, result, { engine, model: result.model }); processed += 1;
     await updateStepDetail(job.id, 'ocr', `OCR complete for ${processed + reused}/${assets.length} source file(s)`);
     await maybeQueueRubricEarly();
   }
@@ -1230,7 +1233,36 @@ async function callGlmVision(question, rubric, urls) {
   return { attempted: true, usable: true, description: text(body.choices[0].message.content, 12000), model: body.model || process.env.GLM_VISION_MODEL || 'glm-4.5v', reason: '' };
 }
 
+// The worker fetches the page and sends its bytes, so no signed storage URL leaves us.
+async function callNearVision(question, rubric, urls) {
+  const config = nearAiConfig({ model: process.env.NEAR_AI_VISION_MODEL || process.env.NEAR_AI_OCR_MODEL || NEAR_OCR_MODEL });
+  const images = await resolveVisionImageDataUrls(urls);
+  const { ok, status, body } = await nearPrivateChatCompletion(config, {
+    temperature: 0,
+    max_tokens: 1800,
+    messages: [{
+      role: 'user',
+      content: [
+        ...images.map((image) => ({ type: 'image_url', image_url: { url: image } })),
+        { type: 'text', text: buildVisualRescuePrompt(question, rubric) },
+      ],
+    }],
+  });
+  const description = body?.choices?.[0]?.message?.content;
+  if (!ok || !description) throw new Error(body?.error?.message || `Private visual rescue failed (${status})`);
+  return { attempted: true, usable: true, description: text(description, 12000), model: body.model || config.model, reason: '' };
+}
+
 async function describeVisualEvidence(question, rubric, urls, job) {
+  // No fallback for an opted-in school: a failure retries, then goes to teacher review.
+  if (nearPrivateEnabledForCurrentJob()) {
+    try {
+      return await callNearVision(question, rubric, urls);
+    } catch (error) {
+      if (Number(job.attempt_count || 1) < maxJobAttempts) throw error;
+      return { attempted: true, usable: false, description: '', model: null, reason: String(error.message || error) };
+    }
+  }
   let visual = { attempted: true, usable: false, description: '', model: null, reason: 'No vision provider is configured.' };
   const failures = [];
   if (process.env.DEEPINFRA_API_KEY) {
@@ -1301,14 +1333,9 @@ async function processVisualRescue(job) {
   const evidence = parseJson(question.evidence_json, {});
   const rubric = parseJson(question.rubric_json, {});
   let visual = { attempted: true, usable: false, description: '', model: null, reason: 'No vision provider is configured.' };
-  // Vision rescue runs on non-TEE providers, so a private-inference school gets
-  // the teacher-review path instead of sending scan images out.
-  const privateOnly = nearPrivateEnabledFor(job.school);
-  const candidates = privateOnly ? [] : await visualCandidateUrls(question, { maxPages: 3 });
+  const candidates = await visualCandidateUrls(question, { maxPages: 3 });
   const attempts = [];
-  if (privateOnly) {
-    visual.reason = 'Visual rescue skipped: this school grades with private inference only.';
-  } else if (!candidates.length) {
+  if (!candidates.length) {
     visual.reason = 'No question-linked source scan pages were available for visual rescue.';
   } else {
     // Try highest-ranked page first (OCR label match), then next candidates.
@@ -2115,7 +2142,7 @@ async function tick() {
   });
   try {
     await heartbeatJob(job, 'processing');
-    await runWithInferenceContext({ jobId: job.id, jobType: job.type, school: job.school, testId: job.test_id }, async () => {
+    await runWithInferenceContext({ jobId: job.id, jobType: job.type, school: job.school, schoolId: await inferenceSchoolId(job.school), testId: job.test_id }, async () => {
       if (job.type === 'mistral_ocr') await processOcr(job);
       else if (job.type === 'build_rubric') await processRubric(job);
       else if (job.type === 'materialize_evidence') await processEvidence(job);

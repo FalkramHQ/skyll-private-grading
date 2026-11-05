@@ -3,7 +3,7 @@
  * Pattern extracted from cohort regrade DeepSeek calls.
  */
 
-import { nearPrivateEnabledForCurrentJob } from '../../apps/processing-worker/inferenceContext.js';
+import { assertPrivateRoutingKnown, nearPrivateEnabledForCurrentJob } from '../../apps/processing-worker/inferenceContext.js';
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -132,7 +132,8 @@ async function callJsonModelOnce({
 }
 
 export async function callJsonModel(options = {}) {
-  // A worker job for a school opted into private inference goes to NEAR AI only.
+  // A call for a school opted into private inference goes to NEAR AI only.
+  assertPrivateRoutingKnown();
   if (nearPrivateEnabledForCurrentJob()) {
     const { nearAiConfig, nearPrivateChatCompletion } = await import('../../apps/processing-worker/nearPrivateInference.js');
     const config = nearAiConfig();

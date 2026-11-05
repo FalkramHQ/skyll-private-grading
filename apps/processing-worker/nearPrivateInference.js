@@ -1,9 +1,8 @@
 // NEAR AI Cloud private inference: chat completions that run inside an attested
 // TEE (Intel TDX + NVIDIA confidential GPU), with a verified receipt per response.
 //
-// Opt-in per school (NEAR_AI_SCHOOLS). For an opted-in school every reasoning call
-// goes to NEAR AI only: no fallback to a non-private provider, so a student's
-// answers never leave the TEE path once the school is switched on.
+// Opt-in per school (NEAR_AI_SCHOOLS). For an opted-in school every model call, worker
+// and Vercel, goes to NEAR AI only, with no fallback to a non-private provider.
 //
 // Before the first completion, and again every NEAR_AI_ATTESTATION_TTL_MS, the
 // worker fetches an attestation report with a fresh nonce and verifies it:
@@ -24,8 +23,9 @@ export { currentInferenceContext, nearPrivateEnabledFor, nearPrivateEnabledForCu
 
 const NRAS_URL = 'https://nras.attestation.nvidia.com/v3/attest/gpu';
 let sink = { attestation: async () => {}, receipt: async () => {} };
-let cachedAttestation = null;
-let pendingAttestation = null;
+// Per model: OCR, vision, grading and the key check each run on their own attested nodes.
+const cachedAttestations = new Map();
+const pendingAttestations = new Map();
 
 export class PrivateInferenceVerificationError extends Error {
   constructor(message) {
@@ -43,14 +43,14 @@ const hexBytes = (value, label) => {
 };
 const sameBytes = (a, b) => a.length === b.length && timingSafeEqual(a, b);
 
-export function nearAiConfig() {
+export function nearAiConfig({ model } = {}) {
   const apiKey = process.env.NEAR_AI_API_KEY;
   if (!apiKey) return null;
   return {
     provider: 'nearai',
     baseUrl: (process.env.NEAR_AI_BASE_URL || 'https://cloud-api.near.ai/v1').replace(/\/+$/, ''),
     apiKey,
-    model: process.env.NEAR_AI_MODEL || 'deepseek-ai/DeepSeek-V4.1-Flash-1017',
+    model: model || process.env.NEAR_AI_MODEL || 'deepseek-ai/DeepSeek-V4.1-Flash-1017',
     // NEAR's DeepSeek thinks by default; production grades without thinking, so match it.
     thinking: process.env.NEAR_AI_THINKING === '1',
   };
@@ -61,9 +61,12 @@ export function setPrivateInferenceSink(next) {
   sink = { ...sink, ...next };
 }
 
+// A request with no reply must fail: the worker keeps renewing a running job's lease,
+// so a hung call would otherwise hold that job forever.
 async function nearFetch(config, path, init = {}) {
   const response = await fetch(`${config.baseUrl}${path}`, {
     ...init,
+    signal: init.signal || AbortSignal.timeout(Math.max(1, Number(process.env.NEAR_AI_REQUEST_TIMEOUT_MS || 180_000))),
     headers: {
       authorization: `Bearer ${config.apiKey}`,
       accept: 'application/json',
@@ -189,12 +192,13 @@ export async function verifyAttestationReport(body, nonce, model) {
 /** Fetches and verifies a fresh attestation report, cached for NEAR_AI_ATTESTATION_TTL_MS. */
 export async function verifiedAttestation(config = nearAiConfig(), { force = false } = {}) {
   const ttl = Math.max(60_000, Number(process.env.NEAR_AI_ATTESTATION_TTL_MS || 3_600_000));
-  if (!force && cachedAttestation && cachedAttestation.model === config.model && Date.now() - cachedAttestation.verifiedAtMs < ttl) {
-    return cachedAttestation;
-  }
+  const cached = cachedAttestations.get(config.model);
+  if (!force && cached && Date.now() - cached.verifiedAtMs < ttl) return cached;
   // Concurrent callers share one in-flight attestation instead of each fetching their own.
-  pendingAttestation ||= fetchVerifiedAttestation(config).finally(() => { pendingAttestation = null; });
-  return pendingAttestation;
+  if (!pendingAttestations.has(config.model)) {
+    pendingAttestations.set(config.model, fetchVerifiedAttestation(config).finally(() => pendingAttestations.delete(config.model)));
+  }
+  return pendingAttestations.get(config.model);
 }
 
 async function fetchVerifiedAttestation(config) {
@@ -205,7 +209,7 @@ async function fetchVerifiedAttestation(config) {
 
   const { gateway, models } = await verifyAttestationReport(body, nonce, config.model);
   const verifiedAt = new Date().toISOString();
-  cachedAttestation = {
+  const attestation = {
     id: `att_${sha256Hex(bytes).slice(0, 24)}`,
     model: config.model,
     nonce,
@@ -216,8 +220,11 @@ async function fetchVerifiedAttestation(config) {
     reportSha256: sha256Hex(bytes),
     reportJson: bytes.toString('utf8'),
   };
-  await sink.attestation(attestationRecord(cachedAttestation));
-  return cachedAttestation;
+  // Saved before it is cached: a failed write retries instead of leaving later receipts
+  // pointing at an attestation that was never stored.
+  await sink.attestation(attestationRecord(attestation));
+  cachedAttestations.set(config.model, attestation);
+  return attestation;
 }
 
 function signerSummary(signer) {

@@ -122,6 +122,10 @@ async function callReasoningJsonOnEndpoint(endpoint, prompt, maxTokens, reasonin
  * is required, e.g. the rubric key check must not use the family that built the rubric.
  */
 export async function callDeepinfraModelJson(model, prompt, maxTokens = 4000) {
+  // The rubric key check needs a second model family, so private schools get an attested Qwen.
+  if (nearPrivateEnabledForCurrentJob()) {
+    return callReasoningJsonOnEndpoint(nearAiConfig({ model: process.env.NEAR_AI_KEY_CHECK_MODEL || 'Qwen/Qwen3.8-27B' }), prompt, maxTokens, 'low');
+  }
   const endpoint = deepinfraCompatConfig({ purpose: 'reasoning' });
   if (!endpoint) throw new Error('DEEPINFRA_API_KEY is not configured.');
   return callReasoningJsonOnEndpoint({ ...endpoint, model }, prompt, maxTokens, 'low');

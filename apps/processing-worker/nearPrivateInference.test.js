@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Wallet } from 'ethers';
-import { nearPrivateEnabledFor, replayRtmr3, verifyResponseSignature } from './nearPrivateInference.js';
+import { nearPrivateEnabledFor, replayRtmr3, verifiedAttestation, verifyResponseSignature } from './nearPrivateInference.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const model = 'deepseek-ai/DeepSeek-V4.1-Flash-1017';
@@ -73,6 +73,21 @@ describe('replayRtmr3', () => {
   });
 });
 
+describe('a NEAR AI request with no reply', () => {
+  afterEach(() => {
+    delete process.env.NEAR_AI_REQUEST_TIMEOUT_MS;
+    vi.unstubAllGlobals();
+  });
+
+  it('times out instead of hanging the job', async () => {
+    process.env.NEAR_AI_REQUEST_TIMEOUT_MS = '5';
+    vi.stubGlobal('fetch', (url, init) => new Promise((resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(init.signal.reason));
+    }));
+    await expect(verifiedAttestation({ baseUrl: 'https://near.test/v1', apiKey: 'k', model: 'timeout-test' })).rejects.toThrow(/timed? ?out|abort/i);
+  });
+});
+
 describe('nearPrivateEnabledFor', () => {
   const saved = { key: process.env.NEAR_AI_API_KEY, schools: process.env.NEAR_AI_SCHOOLS };
   afterEach(() => {
@@ -80,10 +95,11 @@ describe('nearPrivateEnabledFor', () => {
     process.env.NEAR_AI_SCHOOLS = saved.schools ?? '';
   });
 
-  it('is off without a key, even for a listed school', () => {
+  it('refuses a listed school without a key rather than falling back', () => {
     process.env.NEAR_AI_API_KEY = '';
     process.env.NEAR_AI_SCHOOLS = 'Demo School';
-    expect(nearPrivateEnabledFor('Demo School')).toBe(false);
+    expect(() => nearPrivateEnabledFor('Demo School')).toThrow(/NEAR_AI_API_KEY/);
+    expect(nearPrivateEnabledFor('Third')).toBe(false);
   });
 
   it('matches listed schools case-insensitively, or every school with *', () => {
@@ -91,6 +107,7 @@ describe('nearPrivateEnabledFor', () => {
     process.env.NEAR_AI_SCHOOLS = 'Demo School, Other';
     expect(nearPrivateEnabledFor('demo school')).toBe(true);
     expect(nearPrivateEnabledFor('Third')).toBe(false);
+    expect(nearPrivateEnabledFor('Old Spelling', 'Other')).toBe(true);
     expect(nearPrivateEnabledFor('')).toBe(false);
     process.env.NEAR_AI_SCHOOLS = '*';
     expect(nearPrivateEnabledFor('Third')).toBe(true);

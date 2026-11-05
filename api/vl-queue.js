@@ -1,6 +1,7 @@
 import { createClient } from '@libsql/client/web';
 import { randomUUID } from 'node:crypto';
 import { ensureAuthTables, requireUser } from './_lib/auth.js';
+import { withRequestInferenceContext } from './_lib/privateInferenceRequest.js';
 import { inActorSchool } from './_lib/schoolScope.js';
 import { internalError } from './_lib/httpError.js';
 import { tursoAuthToken, tursoUrl } from './_lib/env.js';
@@ -722,7 +723,11 @@ export async function releaseTestToStudents(db, actor, { school, testId }, { now
   return { ok: true, testId, releasedAt, releasedBy: actor.username, notified: pushes.length };
 }
 
-export default async function handler(req, res) {
+export default function handler(req, res) {
+  return withRequestInferenceContext(req, 'vl-queue', () => handleVlQueue(req, res));
+}
+
+async function handleVlQueue(req, res) {
   if (handleCors(req, res)) return;
 
   if (!client) {

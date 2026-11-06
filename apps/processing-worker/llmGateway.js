@@ -122,7 +122,8 @@ async function callReasoningJsonOnEndpoint(endpoint, prompt, maxTokens, reasonin
  * is required, e.g. the rubric key check must not use the family that built the rubric.
  */
 export async function callDeepinfraModelJson(model, prompt, maxTokens = 4000) {
-  // The rubric key check needs a second model family, so private schools get an attested Qwen.
+  // A private context must never reach DeepInfra. Worker rubric jobs are not private, so only
+  // the eval's rubric rebuild gets here, and it needs a second attested model family.
   if (nearPrivateEnabledForCurrentJob()) {
     return callReasoningJsonOnEndpoint(nearAiConfig({ model: process.env.NEAR_AI_KEY_CHECK_MODEL || 'Qwen/Qwen3.8-27B' }), prompt, maxTokens, 'low');
   }

@@ -2,7 +2,7 @@
 import PDFDocument from 'pdfkit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UNREAD_REGION_MARKER } from '../../shared/unreadRegion.js';
-import { NEAR_OCR_FALLBACK_MODEL, NEAR_OCR_MODEL, NEAR_OCR_PROMPT, ocrWithNearAi, pageImagesFor } from './nearOcr.js';
+import { NEAR_OCR_FALLBACK_MODEL, NEAR_OCR_MODEL, NEAR_OCR_PROMPT, ocrWithNearAi, pageImagesFor, readsStudentWork } from './nearOcr.js';
 
 const reply = (content, finish_reason = 'stop') => ({
   ok: true,
@@ -25,6 +25,16 @@ function pdfWithPages(count) {
     doc.end();
   });
 }
+
+describe('readsStudentWork', () => {
+  it('sends only papers and keys outside the TEE', () => {
+    expect(readsStudentWork('question_paper')).toBe(false);
+    expect(readsStudentWork('answer_key')).toBe(false);
+    expect(readsStudentWork('answer_sheet')).toBe(true);
+    expect(readsStudentWork('a_kind_added_later')).toBe(true);
+    expect(readsStudentWork(undefined)).toBe(true);
+  });
+});
 
 describe('ocrWithNearAi', () => {
   const savedKey = process.env.NEAR_AI_API_KEY;

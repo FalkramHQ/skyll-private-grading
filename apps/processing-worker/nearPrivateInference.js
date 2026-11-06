@@ -1,8 +1,9 @@
 // NEAR AI Cloud private inference: chat completions that run inside an attested
 // TEE (Intel TDX + NVIDIA confidential GPU), with a verified receipt per response.
 //
-// Opt-in per school (NEAR_AI_SCHOOLS). For an opted-in school every model call, worker
-// and Vercel, goes to NEAR AI only, with no fallback to a non-private provider.
+// Opt-in per school (NEAR_AI_SCHOOLS). For an opted-in school every model call carrying
+// student data, worker and Vercel, goes to NEAR AI only, with no fallback to a non-private
+// provider. Rubric jobs read only the paper and key, so they stay on the normal providers.
 //
 // Before the first completion, and again every NEAR_AI_ATTESTATION_TTL_MS, the
 // worker fetches an attestation report with a fresh nonce and verifies it:

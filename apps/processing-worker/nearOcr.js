@@ -1,7 +1,7 @@
-// OCR inside NEAR AI's TEE, for schools opted into private inference. Every other school
-// stays on Datalab. This is the one sanctioned exception to "no vision models for text
-// extraction" (AGENTS.md): no attested OCR service exists, and sending scans to Datalab
-// takes them out of the TEE.
+// OCR inside NEAR AI's TEE, for student work from schools opted into private inference.
+// Every other school, and every question paper and answer key, stays on Datalab. This is
+// the one sanctioned exception to "no vision models for text extraction" (AGENTS.md): no
+// attested OCR service exists, and sending answer sheets to Datalab takes them out of the TEE.
 
 import { UNREAD_REGION_MARKER } from '../../shared/unreadRegion.js';
 import { nearAiConfig, nearPrivateChatCompletion } from './nearPrivateInference.js';
@@ -29,6 +29,11 @@ export const NEAR_OCR_PROMPT = `Transcribe this exam page exactly as written. Yo
 - If the page has no writing at all, reply with exactly ${BLANK_PAGE}
 
 Output only the transcription, with no commentary and no code fences.`;
+
+/** Papers and keys are the only kinds known to hold no student work, so anything else stays private. */
+export function readsStudentWork(kind) {
+  return kind !== 'question_paper' && kind !== 'answer_key';
+}
 
 function ocrError(message, { retryable = true, status } = {}) {
   const error = new Error(message);

@@ -1,7 +1,7 @@
 import { createClient } from '@libsql/client';
 import { documentForAsset, isRetryableMistralStatus, normalizeOcrResult, validateRubricPackage } from '../../workers/mistral-ocr/src/ocrProtocol.js';
 import { assetFilename, ocrWithDatalab, resolveOcrEngine } from './datalabOcr.js';
-import { NEAR_OCR_MODEL, ocrWithNearAi } from './nearOcr.js';
+import { NEAR_OCR_MODEL, ocrWithNearAi, readsStudentWork } from './nearOcr.js';
 import { privateInferenceDbSink } from './privateInferenceSink.js';
 import { createAlerter } from '../../shared/alerts.js';
 import { UNCLEAR_SYMBOLS_TAG } from '../../shared/gradingCalibration.js';
@@ -902,8 +902,9 @@ async function processOcr(job) {
   await startStep(job.id, 'validate_inputs', 'Loading private source files directly from R2');
   const assets = await assetsForOcr(job.test_id); if (!assets.length) throw new Error('No uploaded source files are available for OCR.');
   await completeStep(job.id, 'validate_inputs', `${assets.length} uploaded source file(s) verified`);
-  const engine = nearPrivateEnabledForCurrentJob() ? 'near_vl' : ocrEngine;
-  const engineLabel = { near_vl: 'Private', datalab: 'Datalab', mistral: 'Mistral' }[engine];
+  const privateJob = nearPrivateEnabledForCurrentJob();
+  const engineFor = (asset) => (privateJob && readsStudentWork(asset.kind) ? 'near_vl' : ocrEngine);
+  const engineLabel = privateJob ? 'Private' : { datalab: 'Datalab', mistral: 'Mistral' }[ocrEngine];
   await startStep(job.id, 'ocr', `${engineLabel} OCR running for ${assets.length} source file(s)`);
   const payload = parseJson(job.payload_json); let processed = 0; let reused = 0;
   const requiredKinds = new Set(['question_paper', 'answer_key']);
@@ -924,6 +925,7 @@ async function processOcr(job) {
       await maybeQueueRubricEarly();
       continue;
     }
+    const engine = engineFor(asset);
     let result;
     try { result = await runOcrEngine(asset, engine); }
     catch (err) {

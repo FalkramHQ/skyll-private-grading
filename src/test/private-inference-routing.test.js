@@ -64,7 +64,20 @@ describe('private inference routing', () => {
     expect(enabled).toBe(true);
   });
 
-  it('keeps the rubric build and the key check on NEAR AI', async () => {
+  it('keeps a rubric job on the normal providers, since it reads only the paper and key', async () => {
+    const urls = stubFetch();
+    const context = { school: 'Private School', jobType: 'build_rubric' };
+    await expect(runWithInferenceContext(context, () => requestRubricPackage('build it'))).rejects.toThrow();
+    await expect(runWithInferenceContext(context, () => callDeepinfraModelJson('Qwen/Qwen3.8-Flash', 'check it'))).rejects.toThrow();
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.filter((url) => url.startsWith('https://cloud-api.near.ai/'))).toEqual([]);
+  });
+
+  it.each(['mistral_ocr', 'materialize_evidence', 'visual_rescue', 'grade_submission', 'build_reports', 'cohort_regrade'])('keeps a %s job on NEAR AI', (jobType) => {
+    expect(runWithInferenceContext({ school: 'Private School', jobType }, () => nearPrivateEnabledForCurrentJob())).toBe(true);
+  });
+
+  it('never lets a private context reach another provider, even through the rubric helpers', async () => {
     const urls = stubFetch();
     const context = { school: 'Private School' };
     await expect(runWithInferenceContext(context, () => requestRubricPackage('build it'))).rejects.toThrow();

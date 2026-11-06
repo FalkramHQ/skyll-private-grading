@@ -31,8 +31,13 @@ export function nearPrivateEnabledFor(school, schoolId) {
   return listed;
 }
 
-/** Whether a context's model calls take the private path. forcePrivate counts only once a school is opted in. */
-export function nearPrivateEnabledForContext({ school, schoolId, forcePrivate } = {}) {
+/**
+ * Whether a context's model calls take the private path. forcePrivate counts only once a school
+ * is opted in. A rubric job reads only the question paper and answer key, so it carries no
+ * student data and stays on the normal providers.
+ */
+export function nearPrivateEnabledForContext({ school, schoolId, forcePrivate, jobType } = {}) {
+  if (jobType === 'build_rubric') return false;
   if (forcePrivate && optedInSchools().length) {
     if (!process.env.NEAR_AI_API_KEY) throw new Error('NEAR_AI_SCHOOLS is set but NEAR_AI_API_KEY is not.');
     return true;

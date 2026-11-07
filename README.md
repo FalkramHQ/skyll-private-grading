@@ -108,9 +108,9 @@ We measured each step on our evaluation set of real exam questions (human-adjudi
 | What moved into the TEE | Questions | Within one mark, current pipeline | Within one mark, TEE | Gate |
 |---|---:|---:|---:|---|
 | Grading calls only | 2,103 | 88.2% | **88.4%** | Pass |
-| Plus OCR of answer sheets (the setup in this repo) | 2,084 | 86.9% | **85.1%** | Fail: Hindi, SST |
+| Plus OCR of answer sheets (the setup in this repo) | 2,084 | 86.9% | **85.1%** | Fail: two subjects |
 
-- **Answer-sheet OCR.** Hindi fell from 81.5% to 63.0% and SST from 87.9% to 81.8%. Biology and History had too few questions to judge. Answers flagged for teacher review rose about 26%.
+- **Answer-sheet OCR.** Two of the 10 subjects fail the gate. The other eight hold up, at 86.7% against 87.0%, though two of those had too few questions to judge. Answers flagged for teacher review rose about 26%.
 - **Rubric building.** We also tried it in the TEE. A partial run (963 questions, 23 of 40 rubrics, six subjects) fell from 88.7% to 86.1%, with English down 5.3 points and German and Physics 2.8 each. It holds no student data, so we kept it outside.
 - **What this means.** The privacy path works today, and we would not switch on a real school until these gaps close. Teachers review flagged answers before results go out.
 

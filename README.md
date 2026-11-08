@@ -99,7 +99,7 @@ These cover signature checks (TEE and gateway signatures, tampered bytes, keys n
 - **Not in a TEE: rubric building.** Question papers and answer keys go to our normal providers, as described above.
 - **Not in a TEE: Skyll itself.** Our worker, API, database and file storage handle the same data outside a TEE, and teachers see it. That is the service a school signs up for. This project protects what the AI provider can see, not what Skyll can see.
 - **DPDP.** Private inference helps meet the DPDP Act's duty of reasonable security safeguards for children's data, and it limits what our AI vendor can see. It does not on its own make a product DPDP compliant: consent, retention and breach handling are separate obligations.
-- **Rollout.** Private inference is off by default and is switched on per school. No live school is switched on yet. So far it has run on our evaluation set and on synthetic answers. The API routes have run end to end locally with real NEAR calls, and are not yet deployed on Vercel.
+- **Rollout.** Private inference is off by default and is switched on per school. No live school is switched on yet. So far it has run on our evaluation set, on synthetic answers, and on two past tests re-run offline (see below). The API routes have run end to end locally with real NEAR calls, and are not yet deployed on Vercel.
 
 ## Grading quality: what it costs
 
@@ -113,6 +113,23 @@ We measured each step on our evaluation set of real exam questions (human-adjudi
 - **Answer-sheet OCR.** Two of the 10 subjects fail the gate. The other eight hold up, at 86.7% against 87.0%, though two of those had too few questions to judge. Answers flagged for teacher review rose about 26%.
 - **Rubric building.** We also tried it in the TEE. A partial run (963 questions, 23 of 40 rubrics, six subjects) fell from 88.7% to 86.1%, with English down 5.3 points and German and Physics 2.8 each. It holds no student data, so we kept it outside.
 - **What this means.** The privacy path works today, and we would not switch on a real school until these gaps close. Teachers review flagged answers before results go out.
+
+### On two real past tests
+
+We also took two tests that partner institutes had already sat and published, and re-ran them through the TEE setup in this repo, from scanned answer sheets to marks. Physics had 31 students and 775 questions; English had 10 students and 140 questions. Student answers stay off GitHub; this section reports results only.
+
+Teachers changed only 2 of the 915 published marks, so this measures agreement with the marks the institutes accepted, not independent human marking. To show how much a re-run moves on its own, we also re-graded the same answers with the current production pipeline.
+
+| Run | Within one mark of published | Exact | Student total off by (mean) |
+|---|---:|---:|---:|
+| Current pipeline, re-run | 90.4% | 82.6% | 2.12 marks |
+| TEE grading only | 90.2% | 82.5% | 1.88 marks |
+| TEE OCR, extraction and grading (this repo) | 88.0% | 80.3% | 2.16 marks |
+
+- **Grading in the TEE matches the current pipeline.** Physics is 93.2% against 93.0%, and English 73.6% against 75.7%.
+- **The full TEE setup costs about 2.4 points, all in Physics** (90.3% against 93.0%), from reading and extracting answers rather than grading. By our gate, English passes and Physics misses by 0.7 points. Student totals move about as much as on a plain re-run.
+- **English long answers are unstable on any run.** The current pipeline re-run agrees with its own published marks only 75.7% of the time.
+- **Attestation on real data.** Every model call carried a signed receipt: 201 for answer-sheet OCR, 128 for extraction, and 1,513 for grading across both TEE runs. All 1,842 re-verified offline against the five attestation reports saved during the run. Each report had Intel TDX quotes `UpToDate` for the gateway and the model node, NVIDIA GPU evidence verified, and the signing key bound to a fresh nonce. There were no failures. The run cost about $1.36 of NEAR AI credit.
 
 ## Third-party libraries and AI tools used for this work
 
